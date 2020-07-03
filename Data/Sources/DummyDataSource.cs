@@ -23,21 +23,22 @@ namespace SAApi.Data.Sources
             };
         }
 
-        public Task GetData(IDataStream stream, string id, DataSelectionOptions selection, DataManipulationOptions manipulation)
+        public async Task GetData(IDataWriter stream, string id, DataSelectionOptions selection, DataManipulationOptions manipulation)
         {
             if (id == "testset")
             {
+                stream.IsCompatible(typeof(DateTime), typeof(float));
+
                 var range = Helper.IntersectDateTimes(DataSets.ElementAt(0).AvailableXRange, (selection.From, selection.To));
 
                 DateTime current = range.Item1;
 
                 while (current <= range.Item2)
                 {
-                    stream.Write<DateTime, float>(current, (float)_Random.NextDouble());
+                    await stream.Write<DateTime, float>(current, (float)_Random.NextDouble());
+                    current = current.AddDays(1);
                 }
             }
-
-            return Task.CompletedTask;
         }
 
         public Task OnTick(IServiceScope scope)

@@ -61,7 +61,7 @@ namespace SAApi.Services
         public IEnumerable<Data.DataSet> AllDataSets => _Sources.SelectMany(s => s.DataSets);
         public Data.IDataSource GetSource(string id) => _Sources.FirstOrDefault(s => s.Id == id);
 
-        public async Task GetTrace(Data.IDataStream stream, string source, string id, Data.DataSelectionOptions selectionOptions, Data.DataManipulationOptions manipulationOptions) => 
+        public async Task GetTrace(Data.IDataWriter stream, string source, string id, Data.DataSelectionOptions selectionOptions, Data.DataManipulationOptions manipulationOptions) => 
             await GetSource(source).GetData(stream, id, selectionOptions, manipulationOptions);
     }
 }

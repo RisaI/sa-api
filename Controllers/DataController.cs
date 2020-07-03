@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -40,24 +41,43 @@ namespace SAApi.Controllers
             return Ok(_DataSources.GetSource(source));
         }
 
-        [HttpGet("{source}/{set}")]
-        public async Task<ActionResult> GetDataset([FromRoute] string source, [FromRoute] string set)
+        [HttpGet("{sourceId}/{setId}")]
+        public async Task GetDataset([FromRoute] string sourceId, [FromRoute] string setId, [FromQuery] string from, [FromQuery] string to)
         {
-            using (var stream = new Data.EncodeDataStream())
-            {
-                await _DataSources.GetTrace(
-                    stream,
-                    source,
-                    set,
-                    new Data.DataSelectionOptions {
+            var source = _DataSources.GetSource(sourceId);
+            var set = source?.DataSets?.FirstOrDefault(s => s.Id == setId);
 
+            if (source == null || set == null)
+            {
+                Response.StatusCode = 400;
+                return;
+            }
+
+            var range = Helper.ParseRange(set.XType, from, to);
+
+            using (var encoder = new Data.EncodeDataStream(Response.Body))
+            {
+                // Allow synchronous IO for this request
+                // TODO: properly implement asynchronous serialization
+                var syncIOFeature = HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpBodyControlFeature>();
+                if (syncIOFeature != null)
+                {
+                    syncIOFeature.AllowSynchronousIO = true;
+                }
+
+                await source.GetData(
+                    encoder,
+                    setId,
+                    new Data.DataSelectionOptions {
+                        From = range.Item1,
+                        To = range.Item2
                     },
                     new Data.DataManipulationOptions {
 
                     }
                 );
 
-                return Ok(await stream.CreateEncodedString());
+                await Response.CompleteAsync();
             }
         }
     }

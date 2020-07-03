@@ -1,11 +1,12 @@
 
 using System;
+using System.Threading.Tasks;
 
 namespace SAApi.Data
 {
-    public interface IDataStream
+    public interface IDataWriter
     {
         bool IsCompatible(Type xType, Type yType);
-        void Write<X,Y>(X x, Y y);
+        Task Write<X,Y>(X x, Y y);
     }
 }

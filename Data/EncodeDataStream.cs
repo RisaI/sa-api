@@ -1,30 +1,47 @@
 
 using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
 namespace SAApi.Data
 {
-    public class EncodeDataStream : IDataStream, IDisposable
+    public class EncodeDataStream : IDataWriter, IDisposable
     {
-        static readonly Type[] XTypes = new Type[] {  };
-        static readonly Type[] YTypes = new Type[] {  };
+        static readonly Type[] XTypes = new Type[] { typeof(DateTime) };
+        static readonly Type[] YTypes = new Type[] { typeof(double), typeof(float), typeof(int) };
 
         public bool IsCompatible(Type xType, Type yType) => XTypes.Contains(xType) && YTypes.Contains(yType);
 
-        public void Write<X, Y>(X x, Y y)
+        private Stream _Stream;
+        private BinaryWriter _Writer;
+
+        public EncodeDataStream(Stream stream)
         {
-            throw new NotImplementedException();
+            _Stream = stream;
+            _Writer = new BinaryWriter(_Stream);
         }
 
-        public Task<string> CreateEncodedString()
+        public Task Write<X, Y>(X x, Y y)
         {
-            return Task.FromResult(string.Empty);
+            // X data
+            if (x is DateTime a)
+                _Writer.Write(a.Ticks);
+
+            // Y data
+            if (y is double d)
+                _Writer.Write(d);
+            else if (y is float f)
+                _Writer.Write(f);
+            else if (y is int i)
+                _Writer.Write(i);
+
+            return Task.CompletedTask;
         }
 
         public void Dispose()
         {
-            // TODO: dispose underlying stream
+            _Writer.DisposeAsync().GetAwaiter().GetResult();
         }
     }
 }

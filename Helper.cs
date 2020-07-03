@@ -19,5 +19,14 @@ namespace SAApi
         {
             return Intersect(((DateTime)a.Item1, (DateTime)a.Item2), (b.Item1 as DateTime? ?? DateTime.MinValue, b.Item2 as DateTime? ?? DateTime.MaxValue));
         }
+
+        public static (object, object) ParseRange(Type type, string a, string b)
+        {
+            if (type == typeof(DateTime))
+                return (a != null ? (DateTime?)new DateTime(long.Parse(a)) : null,
+                        b != null ? (DateTime?)new DateTime(long.Parse(b)) : null);
+
+            return (null, null);
+        }
     }
 }

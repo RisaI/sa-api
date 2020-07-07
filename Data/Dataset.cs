@@ -8,7 +8,7 @@ using System.Text.Json.Serialization;
 
 namespace SAApi.Data
 {
-    public class DataSet : IIdentified
+    public class Dataset : IIdentified
     {
         public string Id { get; set; }
         public string Name { get; set; }
@@ -24,7 +24,7 @@ namespace SAApi.Data
         [JsonConverter(typeof(RangeTupleConverter))]
         public (object, object) AvailableXRange { get; set; }
 
-        public DataSet(string id, string name, string description, IIdentified source, Type xType, Type yType, (object, object) xRange)
+        public Dataset(string id, string name, string description, IIdentified source, Type xType, Type yType, (object, object) xRange)
         {
             Id = id;
             Name = name;

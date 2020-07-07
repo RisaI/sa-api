@@ -23,17 +23,10 @@ namespace SAApi.Controllers
         }
     
         [HttpGet]
-        public ActionResult<IEnumerable<Data.IDataSource>> GetAllSets()
-        {
-            return Ok(_DataSources.AllDataSets);
-        }
-    
-        [HttpGet("Sources")]
-        public ActionResult<IEnumerable<Data.IDataSource>> GetAllSources()
+        public ActionResult<IEnumerable<Data.DataSource>> GetAllSets()
         {
             return Ok(_DataSources.AllSources);
         }
-
 
         [HttpGet("{source}")]
         public ActionResult<object> GetSource([FromRoute] string source)
@@ -42,10 +35,22 @@ namespace SAApi.Controllers
         }
 
         [HttpGet("{sourceId}/{setId}")]
-        public async Task GetDataset([FromRoute] string sourceId, [FromRoute] string setId, [FromQuery] string from, [FromQuery] string to)
+        public ActionResult<Data.Dataset> GetDataset([FromRoute] string sourceId, [FromRoute] string setId)
         {
             var source = _DataSources.GetSource(sourceId);
-            var set = source?.DataSets?.FirstOrDefault(s => s.Id == setId);
+            var set = source?.Datasets?.FirstOrDefault(s => s.Id == setId);
+
+            if (source == null || set == null)
+                return NotFound();
+
+            return Ok(set);
+        }
+
+        [HttpGet("{sourceId}/{setId}/data")]
+        public async Task GetDatasetData([FromRoute] string sourceId, [FromRoute] string setId, [FromQuery] string from, [FromQuery] string to)
+        {
+            var source = _DataSources.GetSource(sourceId);
+            var set = source?.Datasets?.FirstOrDefault(s => s.Id == setId);
 
             if (source == null || set == null)
             {

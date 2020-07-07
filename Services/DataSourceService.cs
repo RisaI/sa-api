@@ -11,7 +11,7 @@ namespace SAApi.Services
 {
     public class DataSourceService : IHostedService, IDisposable
     {
-        private readonly List<Data.IDataSource> _Sources;
+        private readonly List<Data.DataSource> _Sources;
         private readonly ILogger<DataSourceService> _Logger;
         private readonly IServiceScopeFactory _ScopeFactory;
         private Timer _timer;
@@ -20,7 +20,7 @@ namespace SAApi.Services
         {
             _Logger = logger;
             _ScopeFactory = scopeFactory;
-            _Sources = new List<Data.IDataSource>(128);
+            _Sources = new List<Data.DataSource>(128);
         }
     
         public Task StartAsync(CancellationToken stoppingToken)
@@ -57,9 +57,9 @@ namespace SAApi.Services
             _timer?.Dispose();
         }
 
-        public IReadOnlyList<Data.IDataSource> AllSources => _Sources.AsReadOnly();
-        public IEnumerable<Data.DataSet> AllDataSets => _Sources.SelectMany(s => s.DataSets);
-        public Data.IDataSource GetSource(string id) => _Sources.FirstOrDefault(s => s.Id == id);
+        public IReadOnlyList<Data.DataSource> AllSources => _Sources.AsReadOnly();
+        public IEnumerable<Data.Dataset> AllDataSets => _Sources.SelectMany(s => s.Datasets);
+        public Data.DataSource GetSource(string id) => _Sources.FirstOrDefault(s => s.Id == id);
 
         public async Task GetTrace(Data.IDataWriter stream, string source, string id, Data.DataSelectionOptions selectionOptions, Data.DataManipulationOptions manipulationOptions) => 
             await GetSource(source).GetData(stream, id, selectionOptions, manipulationOptions);

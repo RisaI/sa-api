@@ -7,29 +7,29 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace SAApi.Data.Sources
 {
-    public class DummyDataSource : IDataSource
+    public class DummyDataSource : DataSource
     {
         private static Random _Random = new Random();
 
-        public IEnumerable<DataSet> DataSets { get; private set; }
+        public override IEnumerable<Dataset> Datasets { get; }
 
-        public string Id { get { return "dummy"; } }
-        public string Name { get { return "Dummy Data Source"; } }
+        public override string Id { get { return "dummy"; } }
+        public override string Name { get { return "Dummy Data Source"; } }
 
         public DummyDataSource()
         {
-            DataSets = new [] { 
-                new DataSet("testset", "Testovací set", "Obsahuje náhodně vygenerovaná data na test.", this, typeof(DateTime), typeof(float), (DateTime.Today.AddDays(-90), DateTime.Today))
+            Datasets = new [] { 
+                new Dataset("testset", "Testovací set", "Obsahuje náhodně vygenerovaná data na test.", this, typeof(DateTime), typeof(float), (DateTime.Today.AddDays(-90), DateTime.Today))
             };
         }
 
-        public async Task GetData(IDataWriter stream, string id, DataSelectionOptions selection, DataManipulationOptions manipulation)
+        public override async Task GetData(IDataWriter stream, string id, DataSelectionOptions selection, DataManipulationOptions manipulation)
         {
             if (id == "testset")
             {
                 stream.IsCompatible(typeof(DateTime), typeof(float));
 
-                var range = Helper.IntersectDateTimes(DataSets.ElementAt(0).AvailableXRange, (selection.From, selection.To));
+                var range = Helper.IntersectDateTimes(Datasets.ElementAt(0).AvailableXRange, (selection.From, selection.To));
 
                 DateTime current = range.Item1;
 
@@ -41,7 +41,7 @@ namespace SAApi.Data.Sources
             }
         }
 
-        public Task OnTick(IServiceScope scope)
+        public override Task OnTick(IServiceScope scope)
         {
             return Task.CompletedTask;
         }

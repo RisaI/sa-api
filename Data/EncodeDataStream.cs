@@ -22,18 +22,22 @@ namespace SAApi.Data
             _Writer = new BinaryWriter(_Stream);
         }
 
-        public Task Write<X, Y>(X x, Y y)
+        public async Task Write<X, Y>(X x, Y y)
+        {
+            await Write(x);
+            await Write(y);
+        }
+
+        private Task Write<T>(T obj)
         {
             // X data
-            if (x is DateTime a)
+            if (obj is DateTime a)
                 _Writer.Write(a.Ticks);
-
-            // Y data
-            if (y is double d)
+            else if (obj is double d)
                 _Writer.Write(d);
-            else if (y is float f)
+            else if (obj is float f)
                 _Writer.Write(f);
-            else if (y is int i)
+            else if (obj is int i)
                 _Writer.Write(i);
 
             return Task.CompletedTask;

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace SAApi.Data.Sources
@@ -18,7 +19,7 @@ namespace SAApi.Data.Sources
 
         private float[] SampleData;
 
-        public DummyDataSource()
+        public DummyDataSource(IConfigurationSection config)
         {
             SampleData = new float[91];
             for (int i = 0; i < SampleData.Length; ++i)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -11,13 +12,15 @@ namespace SAApi.Services
 {
     public class DataSourceService : IHostedService, IDisposable
     {
+        private readonly IConfiguration _Config;
         private readonly List<Data.DataSource> _Sources;
         private readonly ILogger<DataSourceService> _Logger;
         private readonly IServiceScopeFactory _ScopeFactory;
         private Timer _timer;
     
-        public DataSourceService(ILogger<DataSourceService> logger, IServiceScopeFactory scopeFactory)
+        public DataSourceService(ILogger<DataSourceService> logger, IServiceScopeFactory scopeFactory, IConfiguration config)
         {
+            _Config = config;
             _Logger = logger;
             _ScopeFactory = scopeFactory;
             _Sources = new List<Data.DataSource>(128);
@@ -27,8 +30,20 @@ namespace SAApi.Services
         {
             _Logger.LogInformation("DataSource Hosted Service running.");
 
-            // TODO: load sources
-            _Sources.Add(new Data.Sources.DummyDataSource());
+            foreach (var source in _Config.GetSection("sources").GetChildren())
+            {
+                switch (source["type"].ToLower())
+                {
+                    case "dummy":
+                        _Sources.Add(new Data.Sources.DummyDataSource(source));
+                        break;
+                    case "hp":
+                        _Sources.Add(new Data.Sources.HPDataSource(source));
+                        break;
+                    default:
+                        throw new ArgumentException($"Source of type '{source["type"]}' does not exist.");
+                }
+            }
     
             _timer = new Timer(OnTick, null, TimeSpan.Zero, TimeSpan.FromSeconds(300));
     

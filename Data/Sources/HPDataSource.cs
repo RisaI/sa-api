@@ -11,7 +11,7 @@ namespace SAApi.Data.Sources
 {
     public class HPDataSource : DataSource
     {
-        const string DateFormat = "yyyy/mm/dd hh:MM", DirectoryDateFormat = "yyyyMMdd";
+        const string DateFormat = "yyyy/MM/dd HH:mm", DirectoryDateFormat = "yyyyMMdd";
         private IConfiguration _Config;
 
         string DataPath { get { return _Config["path"]; } }
@@ -28,32 +28,27 @@ namespace SAApi.Data.Sources
         public override string Name { get { return "Disková pole HP"; } }
 
         public IEnumerable<DateTime> GetAvailableDates { get { return Directory.GetDirectories(DataPath).Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null)); } }
+        public string GetPathFromDate(DateTime date) => Path.Combine(DataPath, $"PFM_{date.ToString(DirectoryDateFormat)}");
 
         public override async Task GetData(IDataWriter writer, string id, DataSelectionOptions selection, DataManipulationOptions manipulation)
         {
+            writer.IsCompatible(typeof(DateTime), typeof(int));
+
             var trace = _Datasets.First(d => d.Id == id);
             var range = Helper.IntersectDateTimes(trace.AvailableXRange, (selection.From, selection.To));
 
             var dates = GetAvailableDates.Where(d => d >= range.Item1.Date.AddDays(-1) && d <= range.Item2.Date.AddDays(1)).OrderBy(d => d.Ticks);
 
-            
             foreach (var day in dates)
             {
-                // TODO: correct date to path translation
-                using (var stream = new FileStream(trace.ZipPath, FileMode.Open, FileAccess.Read))
+                using (var stream = new FileStream(Path.Combine(GetPathFromDate(day), trace.ZipPath), FileMode.Open, FileAccess.Read))
                 using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, false))
                 {
                     var entry = zip.GetEntry(trace.FileEntry);
 
-                    using (var reader = new StreamReader(entry.Open()))
+                    using (var fStream = entry.Open())
                     {
-                        for (int i = 0; i < 7; ++i)
-                            await reader.ReadLineAsync();
-
-                        // while ()
-                        // Read lines
-                        // col 2 = date x
-                        // col trace.Column y
+                        await ReadColumnData(fStream, writer, trace.Column, range.Item1, range.Item2);
                     }
                 }
             }
@@ -72,12 +67,12 @@ namespace SAApi.Data.Sources
 
             var latestDir = Path.Combine(DataPath, $"PFM_{availableRange.Item2.ToString(DirectoryDateFormat)}");
 
-            await ScanZip(Path.Combine(latestDir, "LDEV_Short.zip"), _temp, availableRange);
-            await ScanZip(Path.Combine(latestDir, "PhyMPU_dat.ZIP"), _temp, availableRange);
-            await ScanZip(Path.Combine(latestDir, "PhyPG_dat.ZIP"), _temp, availableRange);
-            await ScanZip(Path.Combine(latestDir, "PhyProc_Cache_dat.ZIP"), _temp, availableRange);
-            await ScanZip(Path.Combine(latestDir, "PhyProc_dat.ZIP"), _temp, availableRange);
-            await ScanZip(Path.Combine(latestDir, "Port_dat.ZIP"), _temp, availableRange);
+            await ScanZip(latestDir, "LDEV_Short.zip", _temp, availableRange);
+            await ScanZip(latestDir, "PhyMPU_dat.ZIP", _temp, availableRange);
+            await ScanZip(latestDir, "PhyPG_dat.ZIP", _temp, availableRange);
+            await ScanZip(latestDir, "PhyProc_Cache_dat.ZIP", _temp, availableRange);
+            await ScanZip(latestDir, "PhyProc_dat.ZIP", _temp, availableRange);
+            await ScanZip(latestDir, "Port_dat.ZIP", _temp, availableRange);
 
             // Swapnout temp a ostrej
             {
@@ -88,31 +83,50 @@ namespace SAApi.Data.Sources
             }
         }
 
-        async Task ScanZip(string path, IList<HPDataset> output, (DateTime, DateTime) range)
+        async Task ScanZip(string directory, string zipPath, IList<HPDataset> output, (DateTime, DateTime) range)
         {
-            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read))
+            using (var stream = new FileStream(Path.Combine(directory, zipPath), FileMode.Open, FileAccess.Read))
             using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, false))
             {
                 foreach (var entry in zip.Entries)
                 {
-                    int column = 2;
-                    foreach (var set in (await ScanCsvHeader(entry.Open())).Skip(2).Select(h => 
-                        new HPDataset(
-                            $"{Path.GetFileName(entry.FullName)}_{h}",
-                            $"{entry.FullName}_{h}",
+                    // int column = 2;
+                    foreach (var set in (await ScanCsvHeader(entry.Open())).Skip(2))
+                    {
+                        output.Add(
+                            new HPDataset(
+                            $"{Path.GetFileName(entry.FullName)}_{set}",
+                            $"{entry.FullName}_{set}",
                             string.Empty,
                             this,
                             typeof(DateTime),
                             typeof(int),
                             range) {
                                 
-                            ZipPath = Path.GetRelativePath(DataPath, path), // TODO: fix this
+                            ZipPath = zipPath,
                             FileEntry = entry.FullName,
-                            Column = column++,
-                        }))
-                    {
-                        output.Add(set);
+                            Column = set,
+                        });
                     }
+                }
+            }
+        }
+
+        async Task ReadColumnData(Stream stream, IDataWriter output, string column, DateTime from, DateTime to)
+        {
+            using (var reader = new StreamReader(stream))
+            {
+                for (int i = 0; i < 6; ++i)
+                    await reader.ReadLineAsync();
+
+                var colIdx = Array.IndexOf((await reader.ReadLineAsync()).Split(',').Select(a => a.Trim('"')).ToArray(), column);
+
+                while (!reader.EndOfStream)
+                {
+                    var line = await reader.ReadLineAsync();
+                    var cols = line.Split(',').Select(a => a.Trim('"')).ToArray();
+
+                    await output.Write(DateTime.ParseExact(cols[1], DateFormat, null), int.Parse(cols[colIdx]));
                 }
             }
         }
@@ -133,7 +147,7 @@ namespace SAApi.Data.Sources
     {
         public string ZipPath;
         public string FileEntry;
-        public int Column;
+        public string Column;
 
         public HPDataset(string id, string name, string description, IIdentified source, Type xType, Type yType, (object, object) xRange) : base(id, name, description, source, xType, yType, xRange)
         {

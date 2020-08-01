@@ -74,6 +74,24 @@ namespace SAApi.Data.Sources
             await ScanZip(latestDir, "PhyProc_dat.ZIP", _temp, availableRange);
             await ScanZip(latestDir, "Port_dat.ZIP", _temp, availableRange);
 
+            var dict = new Dictionary<string, List<string>>();
+            foreach (var date in dates)
+            {
+                var path = Path.Combine(DataPath, $"PFM_{date.ToString(DirectoryDateFormat)}");
+
+                await ScanZipVariants(path, "LDEV_Short.zip", dict);
+                await ScanZipVariants(path, "PhyMPU_dat.ZIP", dict);
+                await ScanZipVariants(path, "PhyPG_dat.ZIP", dict);
+                await ScanZipVariants(path, "PhyProc_Cache_dat.ZIP", dict);
+                await ScanZipVariants(path, "PhyProc_dat.ZIP", dict);
+                await ScanZipVariants(path, "Port_dat.ZIP", dict);
+            }
+
+            foreach (var set in _temp)
+            {
+                set.Variants = dict[set.FileEntry].ToArray();
+            }
+
             // Swapnout temp a ostrej
             {
                 var a = _Datasets;
@@ -83,7 +101,7 @@ namespace SAApi.Data.Sources
             }
         }
 
-        async Task ScanZip(string directory, string zipPath, IList<HPDataset> output, (DateTime, DateTime) range)
+        Task ScanZip(string directory, string zipPath, IList<HPDataset> output, (DateTime, DateTime) range)
         {
             using (var stream = new FileStream(Path.Combine(directory, zipPath), FileMode.Open, FileAccess.Read))
             using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, false))
@@ -101,11 +119,30 @@ namespace SAApi.Data.Sources
                         typeof(DateTime),
                         typeof(int),
                         range,
-                        (await ScanCsvHeader(entry.Open())).Skip(2).ToArray()
+                        null
                         ) {
                         ZipPath = zipPath,
                         FileEntry = entry.FullName,
                     });
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+
+        async Task ScanZipVariants(string directory, string zipPath, Dictionary<string, List<string>> output)
+        {
+            using (var stream = new FileStream(Path.Combine(directory, zipPath), FileMode.Open, FileAccess.Read))
+            using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, false))
+            {
+                foreach (var entry in zip.Entries)
+                {
+                    if (!output.ContainsKey(entry.FullName))
+                        output.Add(entry.FullName, new List<string>());
+
+                    var list = output[entry.FullName];
+
+                    list.AddRange((await ScanCsvHeader(entry.Open())).Skip(2).Where(v => !list.Contains(v)));
                 }
             }
         }

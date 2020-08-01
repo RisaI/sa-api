@@ -24,7 +24,9 @@ namespace SAApi.Data
         [JsonConverter(typeof(RangeTupleConverter))]
         public (object, object) AvailableXRange { get; set; }
 
-        public Dataset(string id, string name, string description, IIdentified source, Type xType, Type yType, (object, object) xRange)
+        public string[] Variants { get; set; }
+
+        public Dataset(string id, string name, string description, IIdentified source, Type xType, Type yType, (object, object) xRange, params string[] variants)
         {
             Id = id;
             Name = name;
@@ -34,6 +36,8 @@ namespace SAApi.Data
             YType = yType;
 
             AvailableXRange = xRange;
+
+            Variants = variants;
 
             if (xRange.Item1?.GetType() != XType || xRange.Item2?.GetType() != XType)
                 throw new Exception("Invalid data type in range specification");

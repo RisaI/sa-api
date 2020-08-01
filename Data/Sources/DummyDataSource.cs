@@ -32,7 +32,7 @@ namespace SAApi.Data.Sources
             };
         }
 
-        public override async Task GetData(IDataWriter stream, string id, DataSelectionOptions selection, DataManipulationOptions manipulation)
+        public override async Task GetData(IDataWriter stream, string id, string variant, DataSelectionOptions selection, DataManipulationOptions manipulation)
         {
             if (id == "testset")
             {

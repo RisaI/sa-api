@@ -47,7 +47,7 @@ namespace SAApi.Controllers
         }
 
         [HttpGet("{sourceId}/{setId}/data")]
-        public async Task GetDatasetData([FromRoute] string sourceId, [FromRoute] string setId, [FromQuery] string from, [FromQuery] string to)
+        public async Task GetDatasetData([FromRoute] string sourceId, [FromRoute] string setId, [FromQuery] string variant, [FromQuery] string from, [FromQuery] string to)
         {
             var source = _DataSources.GetSource(sourceId);
             var set = source?.Datasets?.FirstOrDefault(s => s.Id == setId);
@@ -73,6 +73,7 @@ namespace SAApi.Controllers
                 await source.GetData(
                     encoder,
                     setId,
+                    variant,
                     new Data.DataSelectionOptions {
                         From = range.Item1,
                         To = range.Item2

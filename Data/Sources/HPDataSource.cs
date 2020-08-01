@@ -30,7 +30,7 @@ namespace SAApi.Data.Sources
         public IEnumerable<DateTime> GetAvailableDates { get { return Directory.GetDirectories(DataPath).Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null)); } }
         public string GetPathFromDate(DateTime date) => Path.Combine(DataPath, $"PFM_{date.ToString(DirectoryDateFormat)}");
 
-        public override async Task GetData(IDataWriter writer, string id, DataSelectionOptions selection, DataManipulationOptions manipulation)
+        public override async Task GetData(IDataWriter writer, string id, string variant, DataSelectionOptions selection, DataManipulationOptions manipulation)
         {
             writer.IsCompatible(typeof(DateTime), typeof(int));
 
@@ -48,7 +48,7 @@ namespace SAApi.Data.Sources
 
                     using (var fStream = entry.Open())
                     {
-                        await ReadColumnData(fStream, writer, trace.Column, range.Item1, range.Item2);
+                        await ReadColumnData(fStream, writer, variant, range.Item1, range.Item2);
                     }
                 }
             }
@@ -90,24 +90,22 @@ namespace SAApi.Data.Sources
             {
                 foreach (var entry in zip.Entries)
                 {
-                    // int column = 2;
-                    foreach (var set in (await ScanCsvHeader(entry.Open())).Skip(2))
-                    {
-                        output.Add(
-                            new HPDataset(
-                            $"{Path.GetFileName(entry.FullName)}_{set}",
-                            $"{entry.FullName}_{set}",
-                            string.Empty,
-                            this,
-                            typeof(DateTime),
-                            typeof(int),
-                            range) {
-                                
-                            ZipPath = zipPath,
-                            FileEntry = entry.FullName,
-                            Column = set,
-                        });
-                    }
+                    var id = Path.GetFileNameWithoutExtension(entry.FullName);
+
+                    output.Add(
+                        new HPDataset(
+                        id,
+                        id.Replace('_', ' '),
+                        string.Empty,
+                        this,
+                        typeof(DateTime),
+                        typeof(int),
+                        range,
+                        (await ScanCsvHeader(entry.Open())).Skip(2).ToArray()
+                        ) {
+                        ZipPath = zipPath,
+                        FileEntry = entry.FullName,
+                    });
                 }
             }
         }
@@ -147,9 +145,8 @@ namespace SAApi.Data.Sources
     {
         public string ZipPath;
         public string FileEntry;
-        public string Column;
 
-        public HPDataset(string id, string name, string description, IIdentified source, Type xType, Type yType, (object, object) xRange) : base(id, name, description, source, xType, yType, xRange)
+        public HPDataset(string id, string name, string description, IIdentified source, Type xType, Type yType, (object, object) xRange, params string[] variants) : base(id, name, description, source, xType, yType, xRange, variants)
         {
         }
     }

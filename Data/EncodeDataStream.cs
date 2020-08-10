@@ -9,7 +9,7 @@ namespace SAApi.Data
     public class EncodeDataStream : IDataWriter, IDisposable
     {
         static readonly Type[] XTypes = new Type[] { typeof(DateTime) };
-        static readonly Type[] YTypes = new Type[] { typeof(double), typeof(float), typeof(int) };
+        static readonly Type[] YTypes = new Type[] { typeof(float), typeof(int) };
 
         public bool IsCompatible(Type xType, Type yType) => XTypes.Contains(xType) && YTypes.Contains(yType);
 
@@ -32,9 +32,9 @@ namespace SAApi.Data
         {
             // X data
             if (obj is DateTime a)
-                _Writer.Write(a.Ticks);
-            else if (obj is double d)
-                _Writer.Write(d);
+                _Writer.Write((int)((DateTimeOffset)a).ToUnixTimeSeconds());
+            // else if (obj is double d)
+            //     _Writer.Write(d);
             else if (obj is float f)
                 _Writer.Write(f);
             else if (obj is int i)

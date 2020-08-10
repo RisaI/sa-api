@@ -74,7 +74,7 @@ namespace SAApi.Data
         {
             if (value is DateTime date)
             {
-                writer.WriteNumberValue(date.Ticks);
+                writer.WriteNumberValue(((DateTimeOffset)date).ToUnixTimeSeconds());
             }
             else
             {
@@ -93,14 +93,14 @@ namespace SAApi.Data
             
             { typeof(short), "short" },
             { typeof(int), "int" },
-            { typeof(long), "long" },
+            // { typeof(long), "long" },
 
             { typeof(ushort), "ushort" },
             { typeof(uint), "uint" },
-            { typeof(ulong), "ulong" },
+            // { typeof(ulong), "ulong" },
 
             { typeof(float), "float" },
-            { typeof(double), "double" },
+            // { typeof(double), "double" },
         };
 
         public override Type Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

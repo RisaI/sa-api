@@ -59,13 +59,14 @@ namespace SAApi.Data.Sources
         {
             var dirs = Directory.GetDirectories(DataPath);
             var dates = dirs.Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null));
-            var availableRange = (dates.Min(), dates.Max());
+            var nearestDate = dates.Max();
+            var availableRange = (dates.Min(), nearestDate.AddDays(1));
 
             // ? config.zip
             // ? capacity.cfg
             // ? LDEVEachOfCU_dat
 
-            var latestDir = Path.Combine(DataPath, $"PFM_{availableRange.Item2.ToString(DirectoryDateFormat)}");
+            var latestDir = Path.Combine(DataPath, $"PFM_{nearestDate.ToString(DirectoryDateFormat)}");
 
             await ScanZip(latestDir, "LDEV_Short.zip", _temp, availableRange);
             await ScanZip(latestDir, "PhyMPU_dat.ZIP", _temp, availableRange);

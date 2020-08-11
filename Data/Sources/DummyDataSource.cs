@@ -29,6 +29,8 @@ namespace SAApi.Data.Sources
                 new Dataset("testset", "Testovací set", "Obsahuje náhodně vygenerovaná data na test.", this, typeof(DateTime), typeof(float), (DateTime.Today.AddDays(-90), DateTime.Today)),
                 new Dataset("zeros", "Prázdný set", "Obsahuje nuly.", this, typeof(DateTime), typeof(float), (DateTime.Today.AddDays(-90), DateTime.Today)),
                 new Dataset("peak", "Pík", "Obsahuje jeden Gaussovský pík.", this, typeof(DateTime), typeof(float), (DateTime.Today.AddDays(-90), DateTime.Today)),
+                new Dataset("dense", "Hustá data", "Obsahuje 36k bodů.", this, typeof(DateTime), typeof(float), (DateTime.Today.AddDays(-300), DateTime.Today)),
+                new Dataset("extradense", "Extrémně hustá data", "Obsahuje 108k bodů.", this, typeof(DateTime), typeof(float), (DateTime.Today.AddDays(-300), DateTime.Today)),
             };
         }
 
@@ -76,6 +78,34 @@ namespace SAApi.Data.Sources
                 {
                     await stream.Write<DateTime, float>(current, MathF.Exp(-0.7f * MathF.Pow((float)(current - center).TotalDays, 2f)));
                     current = current.AddDays(1);
+                }
+            }
+            else if (id == "dense")
+            {
+                stream.IsCompatible(typeof(DateTime), typeof(float));
+
+                var range = Helper.IntersectDateTimes(Datasets.ElementAt(3).AvailableXRange, (selection.From, selection.To));
+
+                DateTime current = range.Item1.Date;
+
+                while (current <= range.Item2)
+                {
+                    await stream.Write<DateTime, float>(current, (float)_Random.NextDouble() * MathF.Sin(MathF.PI * (float)(current - range.Item1).TotalMinutes / (12f * 3600)));
+                    current = current.AddMinutes(12);
+                }
+            }
+            else if (id == "extradense")
+            {
+                stream.IsCompatible(typeof(DateTime), typeof(float));
+
+                var range = Helper.IntersectDateTimes(Datasets.ElementAt(3).AvailableXRange, (selection.From, selection.To));
+
+                DateTime current = range.Item1.Date;
+
+                while (current <= range.Item2)
+                {
+                    await stream.Write<DateTime, float>(current, (float)_Random.NextDouble());
+                    current = current.AddMinutes(4);
                 }
             }
         }

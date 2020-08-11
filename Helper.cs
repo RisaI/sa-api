@@ -23,8 +23,8 @@ namespace SAApi
         public static (object, object) ParseRange(Type type, string a, string b)
         {
             if (type == typeof(DateTime))
-                return (a != null ? (DateTime?)DateTimeOffset.FromUnixTimeSeconds(int.Parse(a)).UtcDateTime : null,
-                        b != null ? (DateTime?)DateTimeOffset.FromUnixTimeSeconds(int.Parse(b)).UtcDateTime : null);
+                return (a != null ? (DateTime?)DateTimeOffset.FromUnixTimeSeconds(int.Parse(a)).LocalDateTime : null,
+                        b != null ? (DateTime?)DateTimeOffset.FromUnixTimeSeconds(int.Parse(b)).LocalDateTime : null);
 
             return (null, null);
         }

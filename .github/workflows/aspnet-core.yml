@@ -3,8 +3,8 @@ name: ASP.NET Core Build
 on:
   push:
     branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    tags:
+      - 'v*'
 
 jobs:
   build:
@@ -21,7 +21,8 @@ jobs:
       run: dotnet restore
     - name: Build
       run: dotnet build --configuration Release --no-restore
-    - uses: actions/upload-artifact@v2
+    - uses: meeDamian/github-release@2.0
       with:
-        name: release
-        path: ./bin/Release/netcoreapp3.1/
+        token: ${{ secrets.GITHUB_TOKEN }}
+        files: ./bin/Release/netcoreapp3.1/
+        gzip: true

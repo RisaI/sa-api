@@ -22,6 +22,7 @@ jobs:
       run: dotnet build --configuration Release --no-restore
     - run: zip -r release.zip -j bin/Release/netcoreapp3.1/
     - uses: actions/create-release@v1
+      id: create_release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:

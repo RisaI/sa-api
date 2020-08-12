@@ -32,7 +32,7 @@ namespace SAApi.Data.Sources
 
         public override async Task GetData(IDataWriter writer, string id, string variant, DataSelectionOptions selection, DataManipulationOptions manipulation)
         {
-            writer.IsCompatible(typeof(DateTime), typeof(int));
+            writer.SetTypes(typeof(DateTime), typeof(int));
 
             var trace = _Datasets.First(d => d.Id == id);
             var range = Helper.IntersectDateTimes(trace.AvailableXRange, (selection.From, selection.To));

@@ -36,10 +36,10 @@ namespace SAApi.Data.Sources
 
         public override async Task GetData(IDataWriter stream, string id, string variant, DataSelectionOptions selection, DataManipulationOptions manipulation)
         {
+            stream.SetTypes(typeof(DateTime), typeof(float));
+
             if (id == "testset")
             {
-                stream.IsCompatible(typeof(DateTime), typeof(float));
-
                 var range = Helper.IntersectDateTimes(Datasets.ElementAt(0).AvailableXRange, (selection.From, selection.To));
 
                 DateTime current = range.Item1.Date;
@@ -52,8 +52,6 @@ namespace SAApi.Data.Sources
             }
             else if (id == "zeros")
             {
-                stream.IsCompatible(typeof(DateTime), typeof(float));
-
                 var range = Helper.IntersectDateTimes(Datasets.ElementAt(1).AvailableXRange, (selection.From, selection.To));
 
                 DateTime current = range.Item1.Date;
@@ -66,8 +64,6 @@ namespace SAApi.Data.Sources
             }
             else if (id == "peak")
             {
-                stream.IsCompatible(typeof(DateTime), typeof(float));
-
                 var available = Datasets.ElementAt(2).AvailableXRange;
                 var range = Helper.IntersectDateTimes(available, (selection.From, selection.To));
 
@@ -82,8 +78,6 @@ namespace SAApi.Data.Sources
             }
             else if (id == "dense")
             {
-                stream.IsCompatible(typeof(DateTime), typeof(float));
-
                 var range = Helper.IntersectDateTimes(Datasets.ElementAt(3).AvailableXRange, (selection.From, selection.To));
 
                 DateTime current = range.Item1.Date;
@@ -96,8 +90,6 @@ namespace SAApi.Data.Sources
             }
             else if (id == "extradense")
             {
-                stream.IsCompatible(typeof(DateTime), typeof(float));
-
                 var range = Helper.IntersectDateTimes(Datasets.ElementAt(3).AvailableXRange, (selection.From, selection.To));
 
                 DateTime current = range.Item1.Date;

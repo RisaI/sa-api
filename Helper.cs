@@ -28,5 +28,20 @@ namespace SAApi
 
             return (null, null);
         }
+
+        public static int Mod(int a, int b)
+        {
+            return ((a % b) + b) % b;
+        }
+
+        public static float Mod(float a, float b)
+        {
+            return ((a % b) + b) % b;
+        }
+
+        public static double Mod(double a, double b)
+        {
+            return ((a % b) + b) % b;
+        }
     }
 }

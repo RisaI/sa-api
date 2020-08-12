@@ -11,8 +11,6 @@ namespace SAApi.Data
         static readonly Type[] XTypes = new Type[] { typeof(DateTime) };
         static readonly Type[] YTypes = new Type[] { typeof(float), typeof(int) };
 
-        public bool IsCompatible(Type xType, Type yType) => XTypes.Contains(xType) && YTypes.Contains(yType);
-
         private Stream _Stream;
         private BinaryWriter _Writer;
 
@@ -46,6 +44,12 @@ namespace SAApi.Data
         public void Dispose()
         {
             _Writer.DisposeAsync().GetAwaiter().GetResult();
+        }
+
+        public void SetTypes(Type xType, Type yType)
+        {
+            if (!XTypes.Contains(xType) || !YTypes.Contains(yType))
+                throw new InvalidOperationException("Unsupported data types.");
         }
     }
 }

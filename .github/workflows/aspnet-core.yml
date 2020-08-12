@@ -21,7 +21,7 @@ jobs:
     - name: Build
       run: dotnet build --configuration Release --no-restore
     - name: Create the release.zip file
-      run: zip -r ../../release.zip .
+      run: zip -r ../../../release.zip .
       working-directory: bin/Release/netcoreapp3.1/
     - uses: actions/create-release@v1
       id: create_release

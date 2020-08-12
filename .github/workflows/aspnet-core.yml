@@ -20,7 +20,7 @@ jobs:
       run: dotnet restore
     - name: Build
       run: dotnet build --configuration Release --no-restore
-      run:  zip -r release.zip -j bin/Release/netcoreapp3.1/
+    - run: zip -r release.zip -j bin/Release/netcoreapp3.1/
     - uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

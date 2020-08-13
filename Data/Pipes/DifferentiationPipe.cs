@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 
 namespace SAApi.Data.Pipes
 {
+    [Pipe("diff")]
     public class DifferentiationPipe : Pipe
     {
         static Type[] SupportedXTypes = new Type[] { typeof(DateTime), typeof(int), typeof(float) };

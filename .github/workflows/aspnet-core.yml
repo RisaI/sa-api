@@ -23,9 +23,9 @@ jobs:
     - name: Build win10-x64
       run: dotnet publish -c Release -r win10-x64 --self-contained true
     - name: Create the release.zip file
-      run: zip -r ../../../release.zip .
+      run: zip -r ../../../release.zip . -x 'win10-x64/*'
       working-directory: bin/Release/netcoreapp3.1/
-    - name: Create the release.zip file
+    - name: Create the release-win10-x64.zip file
       run: zip -r ../../../../../release-win10-x64.zip .
       working-directory: bin/Release/netcoreapp3.1/win10-x64/publish
     - uses: actions/create-release@v1

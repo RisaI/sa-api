@@ -5,7 +5,7 @@ using NCalc;
 
 namespace SAApi.Data.Pipes
 {
-    [Pipe("expr")]
+    [Pipe("expr", typeof(ExpressionOptions))]
     public class ExpressionPipe : Pipe
     {
         Expression Expression;

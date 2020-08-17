@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using SAApi.Models;
 
 namespace SAApi.Controllers
 {
@@ -46,8 +47,8 @@ namespace SAApi.Controllers
             return Ok(set);
         }
 
-        [HttpGet("{sourceId}/{setId}/data")]
-        public async Task GetDatasetData([FromRoute] string sourceId, [FromRoute] string setId, [FromQuery] string variant, [FromQuery] string from, [FromQuery] string to)
+        [HttpPost("{sourceId}/{setId}")]
+        public async Task GetDatasetData([FromRoute] string sourceId, [FromRoute] string setId, [FromQuery] string variant, [FromBody] FetchDataRequest body)
         {
             var source = _DataSources.GetSource(sourceId);
             var set = source?.Datasets?.FirstOrDefault(s => s.Id == setId);
@@ -58,10 +59,24 @@ namespace SAApi.Controllers
                 return;
             }
 
-            var range = Helper.ParseRange(set.XType, from, to);
+            var range = Helper.ParseRange(set.XType, body.From, body.To);
 
             using (var encoder = new Data.EncodeDataStream(Response.Body))
             {
+                Data.IDataWriter writer = encoder;
+
+                if (body.Manipulations != null)
+                {
+                    foreach (var man in body.Manipulations)
+                    {
+                        var idx = man.IndexOf(':');
+                        if (idx >= 0)
+                            writer = Data.Pipes.Pipe.CompilePipe(man.Substring(0, idx), writer, man.Substring(idx + 1));
+                        else
+                            writer = Data.Pipes.Pipe.CompilePipe(man, writer, string.Empty);
+                    }
+                }
+
                 // Allow synchronous IO for this request
                 // TODO: properly implement asynchronous serialization
                 var syncIOFeature = HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpBodyControlFeature>();
@@ -71,7 +86,7 @@ namespace SAApi.Controllers
                 }
 
                 await source.GetData(
-                    encoder,
+                    writer,
                     setId,
                     variant,
                     new Data.DataSelectionOptions {

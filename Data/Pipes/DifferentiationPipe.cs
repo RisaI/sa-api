@@ -26,7 +26,10 @@ namespace SAApi.Data.Pipes
             if (xType == typeof(DateTime))
             {
                 xDiff = CreateBinaryExpr(xType, xType, (l, r) =>
-                    Expression.Property(Expression.Subtract(l, r), typeof(TimeSpan).GetProperty(nameof(TimeSpan.TotalSeconds))) // Divide to obtain time difference in seconds
+                    Expression.Convert(
+                        Expression.Property(Expression.Subtract(l, r), typeof(TimeSpan).GetProperty(nameof(TimeSpan.TotalSeconds))),
+                        typeof(float)
+                    ) // Divide to obtain time difference in seconds
                 ).Compile();
             }
             else

@@ -18,11 +18,16 @@ jobs:
         dotnet-version: 3.1.301
     - name: Install dependencies
       run: dotnet restore
-    - name: Build
+    - name: Build platform indepentent
       run: dotnet build --configuration Release --no-restore
+    - name: Build win10-x64
+      run: dotnet publish -c Release -r win10-x64 --self-contained true
     - name: Create the release.zip file
       run: zip -r ../../../release.zip .
       working-directory: bin/Release/netcoreapp3.1/
+    - name: Create the release.zip file
+      run: zip -r ../../../../../release-win10-x64.zip .
+      working-directory: bin/Release/netcoreapp3.1/win10-x64/publish
     - uses: actions/create-release@v1
       id: create_release
       env:
@@ -39,4 +44,12 @@ jobs:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./release.zip
         asset_name: release.zip
+        asset_content_type: application/zip
+    - uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release-win10-x64.zip
+        asset_name: release-win10-x64.zip
         asset_content_type: application/zip

@@ -21,6 +21,6 @@ namespace SAApi
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
-                });
+                }).UseWindowsService();
     }
 }

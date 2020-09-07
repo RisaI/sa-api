@@ -75,8 +75,5 @@ namespace SAApi.Services
         public IReadOnlyList<Data.DataSource> AllSources => _Sources.AsReadOnly();
         public IEnumerable<Data.Dataset> AllDataSets => _Sources.SelectMany(s => s.Datasets);
         public Data.DataSource GetSource(string id) => _Sources.FirstOrDefault(s => s.Id == id);
-
-        public async Task GetTrace(Data.IDataWriter stream, string source, string id, string variant, Data.DataSelectionOptions selectionOptions, Data.DataManipulationOptions manipulationOptions) => 
-            await GetSource(source).GetData(stream, id, variant, selectionOptions, manipulationOptions);
     }
 }

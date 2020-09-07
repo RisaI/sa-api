@@ -85,18 +85,14 @@ namespace SAApi.Controllers
                     syncIOFeature.AllowSynchronousIO = true;
                 }
 
-                await source.GetData(
-                    writer,
+                await encoder.Consume(await source.GetNode(
                     setId,
                     variant,
                     new Data.DataSelectionOptions {
                         From = range.Item1,
                         To = range.Item2
-                    },
-                    new Data.DataManipulationOptions {
-
                     }
-                );
+                ));
 
                 await Response.CompleteAsync();
             }

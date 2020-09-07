@@ -30,10 +30,8 @@ namespace SAApi.Data.Sources
         public IEnumerable<DateTime> GetAvailableDates { get { return Directory.GetDirectories(DataPath).Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null)); } }
         public string GetPathFromDate(DateTime date) => Path.Combine(DataPath, $"PFM_{date.ToString(DirectoryDateFormat)}");
 
-        public override async Task GetData(IDataWriter writer, string id, string variant, DataSelectionOptions selection, DataManipulationOptions manipulation)
+        public override async Task<Node> GetNode(string id, string variant, DataSelectionOptions selection)
         {
-            writer.SetTypes(typeof(DateTime), typeof(int));
-
             var trace = _Datasets.First(d => d.Id == id);
             var range = Helper.IntersectDateTimes(trace.AvailableXRange, (selection.From, selection.To));
 

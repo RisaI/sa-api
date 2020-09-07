@@ -44,4 +44,18 @@ namespace SAApi
             return ((a % b) + b) % b;
         }
     }
+
+    public static class Extensions
+    {
+        public static async System.Threading.Tasks.Task Consume(this Data.IDataWriter writer, Data.Node node)
+        {
+            writer.SetTypes(node.XType, node.YType);
+
+            while (await node.HasNextAsync())
+            {
+                var (x, y) = await node.NextAsync();
+                await writer.Write(x, y);
+            }
+        }
+    }
 }

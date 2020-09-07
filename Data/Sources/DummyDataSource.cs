@@ -34,10 +34,8 @@ namespace SAApi.Data.Sources
             };
         }
 
-        public override async Task GetData(IDataWriter stream, string id, string variant, DataSelectionOptions selection, DataManipulationOptions manipulation)
+        public override async Task<Node> GetNode(string id, string variant, DataSelectionOptions selection)
         {
-            stream.SetTypes(typeof(DateTime), typeof(float));
-
             if (id == "testset")
             {
                 var range = Helper.IntersectDateTimes(Datasets.ElementAt(0).AvailableXRange, (selection.From, selection.To));
@@ -105,6 +103,33 @@ namespace SAApi.Data.Sources
         public override Task OnTick(IServiceScope scope)
         {
             return Task.CompletedTask;
+        }
+
+        public class DummyNode : Node
+        {
+            private DateTime _Max;
+            private DateTime _Cursor;
+            private TimeSpan _Jump;
+
+            public DummyNode(DateTime cursor, TimeSpan jump, DateTime max)
+                : base(typeof(DateTime), typeof(float))
+            {
+                _Cursor = cursor;
+                _Jump = jump;
+                _Max = max;
+            }
+
+            public override Task<bool> HasNextAsync()
+            {
+                return Task.FromResult(_Cursor <= _Max);
+            }
+
+            public override Task<(object, object)> NextAsync()
+            {
+
+
+                throw new NotImplementedException();
+            }
         }
     }
 }

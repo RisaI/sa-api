@@ -1,18 +1,19 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using NCalc;
 
 namespace SAApi.Data.Pipes
 {
-    [Pipe("expr", typeof(ExpressionOptions))]
+    [Pipe("expr")]
     public class ExpressionPipe : Pipe
     {
         Expression Expression;
 
-        public ExpressionPipe(Node child, ExpressionOptions options) : base(child.XType, child.YType, child)
+        public ExpressionPipe(Node child, Dictionary<string, object> options) : base(child.XType, child.YType, child)
         {
-            Expression = new Expression(options.Expression, EvaluateOptions.IgnoreCase);
+            Expression = new Expression(options["expression"] as string, EvaluateOptions.IgnoreCase);
             
             if (!XType.IsValueType || !YType.IsValueType)
                 throw new InvalidOperationException("Expressions support only value types");

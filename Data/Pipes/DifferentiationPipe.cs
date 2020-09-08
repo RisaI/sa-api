@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
@@ -12,7 +13,7 @@ namespace SAApi.Data.Pipes
         static Type[] SupportedYTypes = new Type[] { typeof(int), typeof(float) };
 
         Common.RotatingList<(object, object)> rotator;
-        public DifferentiationPipe(Node parent) : base(parent.XType, typeof(float), parent)
+        public DifferentiationPipe(Node parent, Dictionary<string, object> opts) : base(parent.XType, typeof(float), parent)
         {
             rotator = new Common.RotatingList<(object, object)>(3);
             SetTypes(parent.XType, parent.YType);

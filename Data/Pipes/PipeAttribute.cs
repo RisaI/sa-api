@@ -6,12 +6,10 @@ namespace SAApi.Data.Pipes
     public sealed class PipeAttribute : Attribute
     {
         public string Directive { get; private set; }
-        public Type Options { get; private set; }
 
-        public PipeAttribute(string directive, Type options = null)
+        public PipeAttribute(string directive)
         {
             Directive = directive;
-            Options = options;
         }
     }
 }

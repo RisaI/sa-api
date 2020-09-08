@@ -47,36 +47,15 @@ namespace SAApi.Controllers
             return Ok(set);
         }
 
-        [HttpPost("{sourceId}/{setId}")]
-        public async Task GetDatasetData([FromRoute] string sourceId, [FromRoute] string setId, [FromQuery] string variant, [FromBody] FetchDataRequest body)
+        [HttpPost]
+        public async Task GetDatasetData([FromBody] FetchDataRequest body)
         {
-            var source = _DataSources.GetSource(sourceId);
-            var set = source?.Datasets?.FirstOrDefault(s => s.Id == setId);
-
-            if (source == null || set == null)
-            {
-                Response.StatusCode = 400;
-                return;
-            }
-
-            var range = Helper.ParseRange(set.XType, body.From, body.To);
+            // TODO:
+            // ! FIXME:
+            var range = Helper.ParseRange(typeof(DateTime), body.From, body.To);
 
             using (var encoder = new Data.EncodeDataStream(Response.Body))
             {
-                Data.IDataWriter writer = encoder;
-
-                if (body.Manipulations != null)
-                {
-                    foreach (var man in body.Manipulations)
-                    {
-                        var idx = man.IndexOf(':');
-                        if (idx >= 0)
-                            writer = Data.Pipes.Pipe.CompilePipe(man.Substring(0, idx), writer, man.Substring(idx + 1));
-                        else
-                            writer = Data.Pipes.Pipe.CompilePipe(man, writer, string.Empty);
-                    }
-                }
-
                 // Allow synchronous IO for this request
                 // TODO: properly implement asynchronous serialization
                 var syncIOFeature = HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpBodyControlFeature>();
@@ -84,15 +63,17 @@ namespace SAApi.Controllers
                 {
                     syncIOFeature.AllowSynchronousIO = true;
                 }
-
-                await encoder.Consume(await source.GetNode(
-                    setId,
-                    variant,
-                    new Data.DataSelectionOptions {
-                        From = range.Item1,
-                        To = range.Item2
-                    }
-                ));
+                
+                await encoder.Consume(
+                    await Data.Pipes.PipelineCompiler.Compile(
+                        body.Pipeline,
+                        _DataSources,
+                        new Data.DataSelectionOptions {
+                            From = range.Item1,
+                            To = range.Item2
+                        }
+                    )
+                );
 
                 await Response.CompleteAsync();
             }

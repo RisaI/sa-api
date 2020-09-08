@@ -8,36 +8,18 @@ using System.Threading.Tasks;
 
 namespace SAApi.Data.Pipes
 {
-    public abstract class Pipe : IDataWriter
+    public abstract class Pipe : Node
     {
-        public IDataWriter Parent
+        public Node[] Children
         {
             get;
             private set;
         }
 
-        public Pipe(IDataWriter parent)
+        public Pipe(Type xType, Type yType, params Node[] children) :
+            base(xType, yType)
         {
-            Parent = parent;
-        }
-
-        public abstract Task Write<X, Y>(X x, Y y);
-        protected abstract Task OnTerminate();
-        protected abstract (Type, Type) OnSetTypes(Type xType, Type yType);
-
-        public void SetTypes(Type xType, Type yType)
-        {
-            var (nx, ny) = OnSetTypes(xType, yType);
-
-            Parent.SetTypes(nx, ny);
-        }
-
-        public async Task Terminate()
-        {
-            await OnTerminate();
-
-            if (Parent is Pipe p)
-                await p.Terminate();
+            Children = children;
         }
 
         public static IEnumerable<(Type, PipeAttribute)> GetNamedPipeTypes()
@@ -47,42 +29,61 @@ namespace SAApi.Data.Pipes
                 .Where(t => t.Item2 != null);
         }
 
-        static Dictionary<string, Func<IDataWriter, string, Pipe>> LoadedPipes;
+        static Dictionary<string, Func<Node, Dictionary<string, object>, Pipe>> _SingleChild;
+        static Dictionary<string, Func<Node[], Dictionary<string, object>, Pipe>> _WithChildren;
         static Pipe()
         {
-            LoadedPipes = new Dictionary<string, Func<IDataWriter, string, Pipe>>();
+            _SingleChild = new Dictionary<string, Func<Node, Dictionary<string, object>, Pipe>>();
+            _WithChildren = new Dictionary<string, Func<Node[], Dictionary<string, object>, Pipe>>();
+
             foreach (var resolved in GetNamedPipeTypes())
             {
-                ParameterExpression[] @params = new ParameterExpression[] {
-                    Expression.Parameter(typeof(IDataWriter), "writer"),
-                    Expression.Parameter(typeof(string), "unparsed")
-                };
-                Expression expr;
+                var sConstr = resolved.Item1.GetConstructor(new Type[] { typeof(Node), typeof(Dictionary<string, object>) });
+                var mConstr = resolved.Item1.GetConstructor(new Type[] { typeof(Node[]), typeof(Dictionary<string, object>) });
 
-                if (resolved.Item2.Options == null)
+                if (sConstr == null && mConstr == null)
+                    throw new InvalidOperationException($"Named pipe '{resolved.Item1.Name}' is missing a compatible constructor.");
+
+                if (sConstr != null)
                 {
-                    expr = Expression.New(resolved.Item1.GetConstructor(new Type[] { typeof(IDataWriter) }), new Expression[] { @params[0] });
-                }
-                else
-                {
-                    expr = Expression.New(resolved.Item1.GetConstructor(new Type[] { typeof(IDataWriter), resolved.Item2.Options }), new Expression[] {
-                        @params[0],
-                        Expression.Convert(Expression.Call(
-                            typeof(JsonSerializer).GetMethod(nameof(JsonSerializer.Deserialize), new Type[] { typeof(string), typeof(Type), typeof(JsonSerializerOptions) }),
-                            @params[1],
-                            Expression.Constant(resolved.Item2.Options),
-                            Expression.Constant(new JsonSerializerOptions() { PropertyNameCaseInsensitive = true })
-                        ), resolved.Item2.Options)
-                    });
+                    ParameterExpression[] @params = new ParameterExpression[] {
+                        Expression.Parameter(typeof(Node), "child"),
+                        Expression.Parameter(typeof(Dictionary<string, object>), "options")
+                    };
+
+                    var expr = Expression.New(sConstr, @params);
+
+                    _SingleChild.Add(
+                        resolved.Item2.Directive,
+                        Expression.Lambda(expr, false, @params).Compile() as Func<Node, Dictionary<string, object>, Pipe>
+                    );
                 }
 
-                LoadedPipes.Add(resolved.Item2.Directive, Expression.Lambda(expr, false, @params).Compile() as Func<IDataWriter, string, Pipe>);
+                if (mConstr != null)
+                {
+                    ParameterExpression[] @params = new ParameterExpression[] {
+                        Expression.Parameter(typeof(Node[]), "children"),
+                        Expression.Parameter(typeof(Dictionary<string, object>), "options")
+                    };
+
+                    var expr = Expression.New(mConstr, @params);
+
+                    _WithChildren.Add(
+                        resolved.Item2.Directive,
+                        Expression.Lambda(expr, false, @params).Compile() as Func<Node[], Dictionary<string, object>, Pipe>
+                    );
+                }
             }
         }
 
-        public static Pipe CompilePipe(string type, IDataWriter writer, string parms)
+        public static Pipe CompilePipe(string type, Node child, Dictionary<string, object> @params)
         {
-            return LoadedPipes[type].Invoke(writer, parms);
+            return _SingleChild[type].Invoke(child, @params);
+        }
+
+        public static Pipe CompilePipe(string type, Node[] children, Dictionary<string, object> @params)
+        {
+            return _WithChildren[type].Invoke(children, @params);
         }
     }
 }

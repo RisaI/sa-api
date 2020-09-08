@@ -12,8 +12,8 @@ namespace SAApi.Data
             set { _Connected = value || _Connected; }
         }
 
-        public Type XType { get; private set; }
-        public Type YType { get; private set; }
+        public Type XType { get; protected set; }
+        public Type YType { get; protected set; }
 
         public Node(Type xType, Type yType)
         {

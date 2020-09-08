@@ -12,14 +12,15 @@ namespace SAApi.Data.Pipes
         static Type[] SupportedYTypes = new Type[] { typeof(int), typeof(float) };
 
         Common.RotatingList<(object, object)> rotator;
-        public DifferentiationPipe(IDataWriter parent) : base(parent)
+        public DifferentiationPipe(Node parent) : base(parent.XType, typeof(float), parent)
         {
             rotator = new Common.RotatingList<(object, object)>(3);
+            SetTypes(parent.XType, parent.YType);
         }
 
         Delegate xDiff, yDiff;
         Func<object, object, float> yxDiv;
-        protected override (Type, Type) OnSetTypes(Type xType, Type yType)
+        protected void SetTypes(Type xType, Type yType)
         {
             yDiff = CreateBinaryExpr(yType, yType, (l, r) => Expression.Convert(Expression.Subtract(l, r), typeof(float))).Compile();
 
@@ -40,8 +41,6 @@ namespace SAApi.Data.Pipes
             }
 
             yxDiv = (l, r) => ((float)l) / ((float)r);
-
-            return (xType, typeof(float));
         }
 
         static LambdaExpression CreateBinaryExpr(Type leftType, Type rightType, Func<Expression, Expression, Expression> operation)
@@ -52,36 +51,64 @@ namespace SAApi.Data.Pipes
         }
 
         int _Written = 0;
-        public override async Task Write<X, Y>(X x, Y y)
+        bool last = false;
+
+        public override async Task<bool> HasNextAsync()
         {
-            rotator.Push((x, y));
+            if (_Written < 1)
+                await PullFirstAsync();
 
-            if (_Written == 1)
-            {
-                var (pX, pY) = ((X,Y))rotator[-1];
-
-                await Parent.Write(pX, yxDiv.Invoke(yDiff.DynamicInvoke(y, pY), xDiff.DynamicInvoke(x, pX)));
-
-            }
-            else if (_Written > 1)
-            {
-                var (pX, pY) = ((X,Y))rotator[-2];
-                var cX = (X)rotator[-1].Item1;
-
-                await Parent.Write(pX, yxDiv.Invoke(yDiff.DynamicInvoke(y, pY), xDiff.DynamicInvoke(x, pX)));
-            }
-
-            ++_Written;
+            return await Children.First().HasNextAsync() || last;
         }
 
-        protected override async Task OnTerminate()
+        public override async Task<(object, object)> NextAsync()
         {
-            if (_Written > 1)
+            if (_Written < 1)
+                await PullFirstAsync();
+
+            if (!last)
             {
+                rotator.Push(await Children.First().NextAsync());
+
+                if (!(await Children.First().HasNextAsync()))
+                    last = true;
+                
+                if (+_Written++ == 1)
+                {
+                    var (x, y) = rotator[0];
+                    var (pX, pY) = rotator[-1];
+
+                    return (pX, yxDiv.Invoke(yDiff.DynamicInvoke(y, pY), xDiff.DynamicInvoke(x, pX)));
+
+                }
+                else
+                {
+                    var (pX, pY) = rotator[-2];
+                    var (nX, nY) = rotator[0];
+                    var cX = rotator[-1].Item1;
+
+                    return (cX, yxDiv.Invoke(yDiff.DynamicInvoke(nY, pY), xDiff.DynamicInvoke(nX, pX)));
+                }
+            }
+            else
+            {
+                last = false;
+
                 var (x, y) = rotator[0];
                 var (pX, pY) = rotator[-1];
 
-                await Parent.Write(pX, yxDiv.Invoke(yDiff.DynamicInvoke(y, pY), xDiff.DynamicInvoke(x, pX)));
+                return (x, yxDiv.Invoke(yDiff.DynamicInvoke(y, pY), xDiff.DynamicInvoke(x, pX)));
+            }
+        }
+
+        private async Task PullFirstAsync()
+        {
+            var f = Children.First();
+
+            if (await f.HasNextAsync())
+            {
+                _Written = 1;
+                rotator.Push(await f.NextAsync());
             }
         }
     }

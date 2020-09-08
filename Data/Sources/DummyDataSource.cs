@@ -26,78 +26,40 @@ namespace SAApi.Data.Sources
                 SampleData[i] = (float)_Random.NextDouble();
 
             Datasets = new [] { 
-                new Dataset("testset", "Testovací set", "Obsahuje náhodně vygenerovaná data na test.", this, typeof(DateTime), typeof(float), (DateTime.Today.AddDays(-90), DateTime.Today)),
-                new Dataset("zeros", "Prázdný set", "Obsahuje nuly.", this, typeof(DateTime), typeof(float), (DateTime.Today.AddDays(-90), DateTime.Today)),
-                new Dataset("peak", "Pík", "Obsahuje jeden Gaussovský pík.", this, typeof(DateTime), typeof(float), (DateTime.Today.AddDays(-90), DateTime.Today)),
-                new Dataset("dense", "Hustá data", "Obsahuje 36k bodů.", this, typeof(DateTime), typeof(float), (DateTime.Today.AddDays(-300), DateTime.Today)),
-                new Dataset("extradense", "Extrémně hustá data", "Obsahuje 108k bodů.", this, typeof(DateTime), typeof(float), (DateTime.Today.AddDays(-300), DateTime.Today)),
+                new DummyDataset(
+                    "testset", "Testovací set", "Obsahuje náhodně vygenerovaná data na test.", this, 
+                    (DateTime.Today.AddDays(-90), DateTime.Today), TimeSpan.FromDays(1),
+                    (date, idx) => SampleData[idx]
+                ),
+                new DummyDataset(
+                    "zeros", "Prázdný set", "Obsahuje nuly.", this,
+                    (DateTime.Today.AddDays(-90), DateTime.Today), TimeSpan.FromDays(1),
+                    (date, idx) => 0f
+                ),
+                new DummyDataset(
+                    "peak", "Pík", "Obsahuje jeden Gaussovský pík.", this,
+                    (DateTime.Today.AddDays(-90), DateTime.Today), TimeSpan.FromDays(1),
+                    (date, idx) => MathF.Exp(-0.7f * MathF.Pow((float)(date - DateTime.Today.AddDays(-45)).TotalDays, 2f))
+                ),
+                new DummyDataset(
+                    "dense", "Hustá data", "Obsahuje 36k bodů.", this,
+                    (DateTime.Today.AddDays(-300), DateTime.Today), TimeSpan.FromMinutes(12),
+                    (date, idx) => (float)_Random.NextDouble()
+                ),
+                new DummyDataset(
+                    "extradense", "Extrémně hustá data", "Obsahuje 108k bodů.", this,
+                    (DateTime.Today.AddDays(-300), DateTime.Today), TimeSpan.FromMinutes(4),
+                    (date, idx) => (float)_Random.NextDouble()
+                ),
             };
         }
 
-        public override async Task<Node> GetNode(string id, string variant, DataSelectionOptions selection)
+        public override Task<Node> GetNode(string id, string variant, DataSelectionOptions selection)
         {
-            if (id == "testset")
-            {
-                var range = Helper.IntersectDateTimes(Datasets.ElementAt(0).AvailableXRange, (selection.From, selection.To));
+            var dataset = Datasets.First(d => d.Id == id) as DummyDataset;
+            var range = Helper.IntersectDateTimes(dataset.AvailableXRange, (selection.From, selection.To));
 
-                DateTime current = range.Item1.Date;
-
-                while (current <= range.Item2)
-                {
-                    await stream.Write<DateTime, float>(current, SampleData[(int)(current - (DateTime)Datasets.ElementAt(0).AvailableXRange.Item1).TotalDays]);
-                    current = current.AddDays(1);
-                }
-            }
-            else if (id == "zeros")
-            {
-                var range = Helper.IntersectDateTimes(Datasets.ElementAt(1).AvailableXRange, (selection.From, selection.To));
-
-                DateTime current = range.Item1.Date;
-
-                while (current <= range.Item2)
-                {
-                    await stream.Write<DateTime, float>(current, 0);
-                    current = current.AddDays(1);
-                }
-            }
-            else if (id == "peak")
-            {
-                var available = Datasets.ElementAt(2).AvailableXRange;
-                var range = Helper.IntersectDateTimes(available, (selection.From, selection.To));
-
-                DateTime current = range.Item1.Date;
-                var center = (DateTime)range.Item1 + ((DateTime)range.Item2 - (DateTime)range.Item1) / 2;
-
-                while (current <= range.Item2)
-                {
-                    await stream.Write<DateTime, float>(current, MathF.Exp(-0.7f * MathF.Pow((float)(current - center).TotalDays, 2f)));
-                    current = current.AddDays(1);
-                }
-            }
-            else if (id == "dense")
-            {
-                var range = Helper.IntersectDateTimes(Datasets.ElementAt(3).AvailableXRange, (selection.From, selection.To));
-
-                DateTime current = range.Item1.Date;
-
-                while (current <= range.Item2)
-                {
-                    await stream.Write<DateTime, float>(current, (float)_Random.NextDouble() * MathF.Sin(MathF.PI * (float)(current - range.Item1).TotalMinutes / (12f * 3600)));
-                    current = current.AddMinutes(12);
-                }
-            }
-            else if (id == "extradense")
-            {
-                var range = Helper.IntersectDateTimes(Datasets.ElementAt(3).AvailableXRange, (selection.From, selection.To));
-
-                DateTime current = range.Item1.Date;
-
-                while (current <= range.Item2)
-                {
-                    await stream.Write<DateTime, float>(current, (float)_Random.NextDouble());
-                    current = current.AddMinutes(4);
-                }
-            }
+            return Task.FromResult<Node>(new DummyNode((DateTime)dataset.AvailableXRange.Item1, dataset.Jump, range, dataset.Func));
         }
 
         public override Task OnTick(IServiceScope scope)
@@ -105,18 +67,41 @@ namespace SAApi.Data.Sources
             return Task.CompletedTask;
         }
 
+        public class DummyDataset : Dataset
+        {
+            public TimeSpan Jump;
+            public Func<DateTime, int, float> Func;
+            
+            public DummyDataset(string id, string name, string description, IIdentified source, (DateTime, DateTime) xRange, TimeSpan jump, Func<DateTime, int, float> func) :
+                base(id, name, description, source, typeof(DateTime), typeof(float), xRange, null)
+            {
+                Jump = jump;
+                Func = func;
+            }
+        }
+
         public class DummyNode : Node
         {
-            private DateTime _Max;
+            private int _Idx = 0;
             private DateTime _Cursor;
+            private DateTime _Max;
             private TimeSpan _Jump;
+            private Func<DateTime, int, float> _Func;
 
-            public DummyNode(DateTime cursor, TimeSpan jump, DateTime max)
+            public DummyNode(DateTime start, TimeSpan jump, (DateTime, DateTime) range, Func<DateTime, int, float> func)
                 : base(typeof(DateTime), typeof(float))
             {
-                _Cursor = cursor;
                 _Jump = jump;
-                _Max = max;
+                _Func = func;
+
+                _Cursor = start;
+                _Max = range.Item2;
+
+                while (_Cursor < range.Item1)
+                {
+                    _Cursor += _Jump;
+                    ++_Idx;
+                }
             }
 
             public override Task<bool> HasNextAsync()
@@ -126,9 +111,12 @@ namespace SAApi.Data.Sources
 
             public override Task<(object, object)> NextAsync()
             {
+                (object, object) val = (_Cursor, _Func.Invoke(_Cursor, _Idx));
 
+                _Cursor += _Jump;
+                ++_Idx;
 
-                throw new NotImplementedException();
+                return Task.FromResult(val);
             }
         }
     }

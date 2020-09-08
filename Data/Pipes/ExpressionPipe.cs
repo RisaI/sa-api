@@ -10,33 +10,32 @@ namespace SAApi.Data.Pipes
     {
         Expression Expression;
 
-        public ExpressionPipe(IDataWriter parent, ExpressionOptions options) : base(parent)
+        public ExpressionPipe(Node child, ExpressionOptions options) : base(child.XType, child.YType, child)
         {
             Expression = new Expression(options.Expression, EvaluateOptions.IgnoreCase);
-        }
-
-        protected override (Type, Type) OnSetTypes(Type xType, Type yType)
-        {
-            if (!xType.IsValueType || !yType.IsValueType)
+            
+            if (!XType.IsValueType || !YType.IsValueType)
                 throw new InvalidOperationException("Expressions support only value types");
 
-            Expression.Parameters["x"] = Activator.CreateInstance(xType);
-            Expression.Parameters["y"] = Activator.CreateInstance(yType);
+            Expression.Parameters["x"] = Activator.CreateInstance(XType);
+            Expression.Parameters["y"] = Activator.CreateInstance(YType);
 
-            return (xType, Expression.Evaluate().GetType());
+            YType = Expression.Evaluate().GetType();
         }
 
-        public override async Task Write<X, Y>(X x, Y y)
+        public override Task<bool> HasNextAsync()
         {
+            return Children.First().HasNextAsync();
+        }
+
+        public override async Task<(object, object)> NextAsync()
+        {
+            var (x, y) = await Children.First().NextAsync();
+
             Expression.Parameters["x"] = x;
             Expression.Parameters["y"] = y;
 
-            await Parent.Write(x, Expression.Evaluate());
-        }
-
-        protected override Task OnTerminate()
-        {
-            return Task.CompletedTask;
+            return (x, Expression.Evaluate());
         }
     }
 

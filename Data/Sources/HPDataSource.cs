@@ -30,26 +30,29 @@ namespace SAApi.Data.Sources
         public IEnumerable<DateTime> GetAvailableDates { get { return Directory.GetDirectories(DataPath).Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null)); } }
         public string GetPathFromDate(DateTime date) => Path.Combine(DataPath, $"PFM_{date.ToString(DirectoryDateFormat)}");
 
-        public override async Task<Node> GetNode(string id, string variant, DataSelectionOptions selection)
+        public override Task<Node> GetNode(string id, string variant, DataSelectionOptions selection)
         {
-            var trace = _Datasets.First(d => d.Id == id);
-            var range = Helper.IntersectDateTimes(trace.AvailableXRange, (selection.From, selection.To));
+            // TODO:
+            // ! FIXME:
+            return Task.FromResult<Node>(null);
+            // var trace = _Datasets.First(d => d.Id == id);
+            // var range = Helper.IntersectDateTimes(trace.AvailableXRange, (selection.From, selection.To));
 
-            var dates = GetAvailableDates.Where(d => d >= range.Item1.Date.AddDays(-1) && d <= range.Item2.Date.AddDays(1)).OrderBy(d => d.Ticks);
+            // var dates = GetAvailableDates.Where(d => d >= range.Item1.Date.AddDays(-1) && d <= range.Item2.Date.AddDays(1)).OrderBy(d => d.Ticks);
 
-            foreach (var day in dates)
-            {
-                using (var stream = new FileStream(Path.Combine(GetPathFromDate(day), trace.ZipPath), FileMode.Open, FileAccess.Read))
-                using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, false))
-                {
-                    var entry = zip.GetEntry(trace.FileEntry);
+            // foreach (var day in dates)
+            // {
+            //     using (var stream = new FileStream(Path.Combine(GetPathFromDate(day), trace.ZipPath), FileMode.Open, FileAccess.Read))
+            //     using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, false))
+            //     {
+            //         var entry = zip.GetEntry(trace.FileEntry);
 
-                    using (var fStream = entry.Open())
-                    {
-                        await ReadColumnData(fStream, writer, variant, range.Item1, range.Item2);
-                    }
-                }
-            }
+            //         using (var fStream = entry.Open())
+            //         {
+            //             await ReadColumnData(fStream, writer, variant, range.Item1, range.Item2);
+            //         }
+            //     }
+            // }
         }
 
         private List<HPDataset> _temp = new List<HPDataset>();

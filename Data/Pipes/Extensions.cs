@@ -3,9 +3,9 @@ namespace SAApi.Data.Pipes
 {
     public static class Extensions
     {
-        public static DifferentiationPipe Differentiate(this IDataWriter writer)
+        public static DifferentiationPipe Differentiate(this Node node)
         {
-            return new DifferentiationPipe(writer);
+            return new DifferentiationPipe(node);
         }
     }
 }

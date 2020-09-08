@@ -54,12 +54,10 @@ namespace SAApi.Data.Sources
             };
         }
 
-        public override Task<Node> GetNode(string id, string variant, DataSelectionOptions selection)
+        public override Task<Node> GetNode(string id, string variant)
         {
             var dataset = Datasets.First(d => d.Id == id) as DummyDataset;
-            var range = Helper.IntersectDateTimes(dataset.AvailableXRange, (selection.From, selection.To));
-
-            return Task.FromResult<Node>(new DummyNode((DateTime)dataset.AvailableXRange.Item1, dataset.Jump, range, dataset.Func));
+            return Task.FromResult<Node>(new DummyNode((DateTime)dataset.AvailableXRange.Item1, dataset.Jump, dataset.AvailableXRange, dataset.Func));
         }
 
         public override Task OnTick(IServiceScope scope)
@@ -87,17 +85,24 @@ namespace SAApi.Data.Sources
             private DateTime _Max;
             private TimeSpan _Jump;
             private Func<DateTime, int, float> _Func;
+            private (object, object) AvailableXRange;
 
-            public DummyNode(DateTime start, TimeSpan jump, (DateTime, DateTime) range, Func<DateTime, int, float> func)
+            public DummyNode(DateTime start, TimeSpan jump, (object, object) availableXRange, Func<DateTime, int, float> func)
                 : base(typeof(DateTime), typeof(float))
             {
                 _Jump = jump;
                 _Func = func;
+                AvailableXRange = availableXRange;
 
                 _Cursor = start;
-                _Max = range.Item2;
+            }
 
-                while (_Cursor < range.Item1)
+            public override void ApplyXRange((object, object) xRange)
+            {
+                var range = Helper.IntersectDateTimes(AvailableXRange, (xRange.Item1, xRange.Item2));
+                _Max = (DateTime)xRange.Item2;
+
+                while (_Cursor < (DateTime)xRange.Item1)
                 {
                     _Cursor += _Jump;
                     ++_Idx;

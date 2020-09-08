@@ -23,5 +23,7 @@ namespace SAApi.Data
         
         public abstract Task<bool> HasNextAsync();
         public abstract Task<(object, object)> NextAsync();
+        public abstract void ApplyXRange((object, object) xRange);
+        public virtual Type QueryLeafXType() { return XType; }
     }
 }

@@ -12,7 +12,7 @@ namespace SAApi.Data
         public abstract string Id { get; }
         public abstract string Name { get; }
 
-        public abstract Task<Node> GetNode(string id, string variant, DataSelectionOptions selection);
+        public abstract Task<Node> GetNode(string id, string variant);
         public abstract Task OnTick(IServiceScope scope);
     }
 }

@@ -29,6 +29,24 @@ namespace SAApi.Data.Pipes
                 .Where(t => t.Item2 != null);
         }
 
+        public override void ApplyXRange((object, object) xRange)
+        {
+            foreach (var child in Children)
+                child.ApplyXRange(xRange);
+        }
+
+        public override Type QueryLeafXType()
+        {
+            var types = Children.Select(c => c.QueryLeafXType()).Distinct().ToArray();
+
+            if (types.Length > 1)
+                throw new ArgumentException("Leaf nodes contain incompatible x axis types.");
+            else if (types.Length < 1)
+                throw new ArgumentException("There are no leaf nodes.");
+            
+            return types[0];
+        }
+
         static Dictionary<string, Func<Node, Dictionary<string, object>, Pipe>> _SingleChild;
         static Dictionary<string, Func<Node[], Dictionary<string, object>, Pipe>> _WithChildren;
         static Pipe()

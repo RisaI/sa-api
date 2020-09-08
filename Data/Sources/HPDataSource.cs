@@ -30,7 +30,7 @@ namespace SAApi.Data.Sources
         public IEnumerable<DateTime> GetAvailableDates { get { return Directory.GetDirectories(DataPath).Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null)); } }
         public string GetPathFromDate(DateTime date) => Path.Combine(DataPath, $"PFM_{date.ToString(DirectoryDateFormat)}");
 
-        public override Task<Node> GetNode(string id, string variant, DataSelectionOptions selection)
+        public override Task<Node> GetNode(string id, string variant)
         {
             // TODO:
             // ! FIXME:

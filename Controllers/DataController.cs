@@ -48,11 +48,21 @@ namespace SAApi.Controllers
         }
 
         [HttpPost]
-        public async Task GetDatasetData([FromBody] FetchDataRequest body)
+        public async Task GetPipelineData([FromBody] FetchDataRequest body)
         {
-            // TODO:
-            // ! FIXME:
-            var range = Helper.ParseRange(typeof(DateTime), body.From, body.To);
+            var pipeline = await Data.Pipes.PipelineCompiler.Compile(
+                body.Pipeline,
+                _DataSources
+            );
+
+            // Parse and apply X range
+            pipeline.ApplyXRange(
+                Helper.ParseRange(
+                    pipeline.QueryLeafXType(),
+                    body.From,
+                    body.To
+                )
+            );
 
             using (var encoder = new Data.EncodeDataStream(Response.Body))
             {
@@ -64,19 +74,24 @@ namespace SAApi.Controllers
                     syncIOFeature.AllowSynchronousIO = true;
                 }
                 
-                await encoder.Consume(
-                    await Data.Pipes.PipelineCompiler.Compile(
-                        body.Pipeline,
-                        _DataSources,
-                        new Data.DataSelectionOptions {
-                            From = range.Item1,
-                            To = range.Item2
-                        }
-                    )
-                );
-
+                // Drain the pipeline into a stream
+                await encoder.Consume(pipeline);
                 await Response.CompleteAsync();
             }
+        }
+
+        [HttpPost("specs")]
+        public async Task<IActionResult> GetPipelineSpecs([FromBody] FetchDataRequest body)
+        {
+            var pipeline = await Data.Pipes.PipelineCompiler.Compile(
+                body.Pipeline,
+                _DataSources
+            );
+
+            return Ok(new PipelineSpecs {
+                XType = pipeline.XType,
+                YType = pipeline.YType,
+            });
         }
     }
 }

@@ -25,7 +25,7 @@ namespace SAApi.Data.Sources
         public override IEnumerable<Dataset> Datasets => _Datasets;
 
         public override string Id { get { return "hp"; } }
-        public override string Name { get { return "Disková pole HP"; } }
+        public override string Name { get { return _Config["name"] ?? "Disková pole HP"; } }
 
         public IEnumerable<DateTime> GetAvailableDates { get { return Directory.GetDirectories(DataPath).Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null)); } }
         public string GetPathFromDate(DateTime date) => Path.Combine(DataPath, $"PFM_{date.ToString(DirectoryDateFormat)}");

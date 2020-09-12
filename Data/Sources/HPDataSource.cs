@@ -11,7 +11,7 @@ namespace SAApi.Data.Sources
 {
     public class HPDataSource : DataSource
     {
-        const string DateFormat = "yyyy/MM/dd HH:mm", DirectoryDateFormat = "yyyyMMdd";
+        public const string DateFormat = "yyyy/MM/dd HH:mm", DirectoryDateFormat = "yyyyMMdd";
         private IConfiguration _Config;
 
         string DataPath { get { return _Config["path"]; } }
@@ -32,27 +32,8 @@ namespace SAApi.Data.Sources
 
         public override Task<Node> GetNode(string id, string variant)
         {
-            // TODO:
-            // ! FIXME:
-            return Task.FromResult<Node>(null);
-            // var trace = _Datasets.First(d => d.Id == id);
-            // var range = Helper.IntersectDateTimes(trace.AvailableXRange, (selection.From, selection.To));
-
-            // var dates = GetAvailableDates.Where(d => d >= range.Item1.Date.AddDays(-1) && d <= range.Item2.Date.AddDays(1)).OrderBy(d => d.Ticks);
-
-            // foreach (var day in dates)
-            // {
-            //     using (var stream = new FileStream(Path.Combine(GetPathFromDate(day), trace.ZipPath), FileMode.Open, FileAccess.Read))
-            //     using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, false))
-            //     {
-            //         var entry = zip.GetEntry(trace.FileEntry);
-
-            //         using (var fStream = entry.Open())
-            //         {
-            //             await ReadColumnData(fStream, writer, variant, range.Item1, range.Item2);
-            //         }
-            //     }
-            // }
+            var dataset = _Datasets.Find(d => d.Id == id);
+            return Task.FromResult<Node>(new HPDataNode(this, dataset, variant));
         }
 
         private List<HPDataset> _temp = new List<HPDataset>();
@@ -149,25 +130,6 @@ namespace SAApi.Data.Sources
             }
         }
 
-        async Task ReadColumnData(Stream stream, IDataWriter output, string column, DateTime from, DateTime to)
-        {
-            using (var reader = new StreamReader(stream))
-            {
-                for (int i = 0; i < 6; ++i)
-                    await reader.ReadLineAsync();
-
-                var colIdx = Array.IndexOf((await reader.ReadLineAsync()).Split(',').Select(a => a.Trim('"')).ToArray(), column);
-
-                while (!reader.EndOfStream)
-                {
-                    var line = await reader.ReadLineAsync();
-                    var cols = line.Split(',').Select(a => a.Trim('"')).ToArray();
-
-                    await output.Write(DateTime.ParseExact(cols[1], DateFormat, null), int.Parse(cols[colIdx]));
-                }
-            }
-        }
-
         async Task<IEnumerable<string>> ScanCsvHeader(Stream stream)
         {
             using (var reader = new StreamReader(stream))
@@ -187,6 +149,95 @@ namespace SAApi.Data.Sources
 
         public HPDataset(string id, string name, string description, IIdentified source, Type xType, Type yType, (object, object) xRange, params string[] variants) : base(id, name, description, source, xType, yType, xRange, variants)
         {
+        }
+    }
+
+    public sealed class HPDataNode : Node
+    {
+        public HPDataSource Source { get; private set; }
+        public HPDataset Dataset { get; private set; }
+        public string Variant { get; private set; }
+
+        private (DateTime, DateTime) SelectedRange;
+
+        public HPDataNode(HPDataSource source, HPDataset set, string variant)
+            : base(set.XType, set.YType)
+        {
+            Source = source;
+            Dataset = set;
+            Variant = variant;
+        }
+
+        private List<DateTime> AvailableDates;
+        public override void ApplyXRange((object, object) xRange)
+        {
+            SelectedRange = Helper.IntersectDateTimes(Dataset.AvailableXRange, xRange);
+            AvailableDates = Source.GetAvailableDates.Where(
+                    d =>
+                        d >= SelectedRange.Item1.Date.AddDays(-1) &&
+                        d <= SelectedRange.Item2.Date.AddDays(1)
+                ).OrderBy(d => d.Ticks).ToList();
+        }
+
+        const int MinCached = 100;
+        List<(DateTime, int)> _Cached = new List<(DateTime, int)>(10_000);
+        public override async Task<bool> HasNextAsync()
+        {
+            while (_Cached.Count < MinCached && AvailableDates.Count > 0)
+                await PullToCache();
+
+            return _Cached.Count > 0;
+        }
+
+        public override Task<(object, object)> NextAsync()
+        {
+            var val = _Cached[0];
+
+            _Cached.RemoveAt(0);
+
+            return Task.FromResult<(object, object)>(val);
+        }
+
+        private async Task PullToCache()
+        {
+            using (var stream = new FileStream(Path.Combine(Source.GetPathFromDate(AvailableDates[0]), Dataset.ZipPath), FileMode.Open, FileAccess.Read))
+            using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, false))
+            {
+                var entry = zip.GetEntry(Dataset.FileEntry);
+
+                using (var fStream = entry.Open())
+                {
+                    await ReadColumnData(fStream, Variant, SelectedRange.Item1, SelectedRange.Item2);
+                }
+            }
+
+            AvailableDates.RemoveAt(0);
+        }
+
+        async Task ReadColumnData(Stream stream, string column, DateTime from, DateTime to)
+        {
+            using (var reader = new StreamReader(stream))
+            {
+                for (int i = 0; i < 6; ++i)
+                    await reader.ReadLineAsync();
+
+                var colIdx = Array.IndexOf((await reader.ReadLineAsync()).Split(',').Select(a => a.Trim('"')).ToArray(), column);
+
+                while (!reader.EndOfStream)
+                {
+                    var line = await reader.ReadLineAsync();
+                    var cols = line.Split(',').Select(a => a.Trim('"')).ToArray();
+
+                    var date = DateTime.ParseExact(cols[1], HPDataSource.DateFormat, null);
+
+                    if (date < from)
+                        continue;
+                    if (date > to)
+                        break;
+
+                    _Cached.Add((date, int.Parse(cols[colIdx])));
+                }
+            }
         }
     }
 }

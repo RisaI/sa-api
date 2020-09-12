@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -50,11 +51,18 @@ namespace SAApi.Controllers
         [HttpPost]
         public async Task GetPipelineData([FromBody] FetchDataRequest body)
         {
+            var watch = new Stopwatch();
+
+            watch.Start();
             var pipeline = await Data.Pipes.PipelineCompiler.Compile(
                 body.Pipeline,
                 _DataSources
             );
+            watch.Stop();
 
+            _Logger.LogDebug($"Compiled the pipeline in {watch.ElapsedMilliseconds} ms.");
+
+            watch.Restart();
             // Parse and apply X range
             pipeline.ApplyXRange(
                 Helper.ParseRange(
@@ -63,6 +71,9 @@ namespace SAApi.Controllers
                     body.To
                 )
             );
+            watch.Stop();
+
+            _Logger.LogDebug($"Applied an x range to the pipeline in {watch.ElapsedMilliseconds} ms.");
 
             using (var encoder = new Data.EncodeDataStream(Response.Body))
             {
@@ -75,7 +86,11 @@ namespace SAApi.Controllers
                 }
                 
                 // Drain the pipeline into a stream
+                watch.Restart();
                 await encoder.Consume(pipeline);
+                watch.Stop();
+                _Logger.LogDebug($"Consumed the pipeline in {watch.ElapsedMilliseconds} ms.");
+
                 await Response.CompleteAsync();
             }
         }

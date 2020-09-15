@@ -13,13 +13,9 @@ namespace SAApi.Data.Sources
         private static Random _Random = new Random();
 
         public override IEnumerable<Dataset> Datasets { get; }
-
-        public override string Id { get { return "dummy"; } }
-        public override string Name { get { return "Dummy Data Source"; } }
-
         private float[] SampleData;
 
-        public DummyDataSource(IConfigurationSection config)
+        public DummyDataSource(string id, IConfigurationSection config) : base(id, "Dummy Data Source", config)
         {
             SampleData = new float[91];
             for (int i = 0; i < SampleData.Length; ++i)

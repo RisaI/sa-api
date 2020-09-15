@@ -12,20 +12,17 @@ namespace SAApi.Data.Sources
     public class HPDataSource : DataSource
     {
         public const string DateFormat = "yyyy/MM/dd HH:mm", DirectoryDateFormat = "yyyyMMdd";
-        private IConfiguration _Config;
 
         string DataPath { get { return _Config["path"]; } }
 
-        public HPDataSource(IConfigurationSection config)
+        public HPDataSource(string id, IConfigurationSection config)
+            : base(id, "Disková pole HP", config)
         {
-            _Config = config;
+
         }
 
         private List<HPDataset> _Datasets = new List<HPDataset>();
         public override IEnumerable<Dataset> Datasets => _Datasets;
-
-        public override string Id { get { return "hp"; } }
-        public override string Name { get { return _Config["name"] ?? "Disková pole HP"; } }
 
         public IEnumerable<DateTime> GetAvailableDates { get { return Directory.GetDirectories(DataPath).Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null)); } }
         public string GetPathFromDate(DateTime date) => Path.Combine(DataPath, $"PFM_{date.ToString(DirectoryDateFormat)}");
@@ -176,7 +173,9 @@ namespace SAApi.Data.Sources
                     d =>
                         d >= SelectedRange.Item1.Date.AddDays(-1) &&
                         d <= SelectedRange.Item2.Date.AddDays(1)
-                ).OrderBy(d => d.Ticks).ToList();
+                )
+                .Where(d => File.Exists(Path.Combine(Source.GetPathFromDate(d), Dataset.ZipPath)))
+                .OrderBy(d => d.Ticks).ToList();
         }
 
         const int MinCached = 100;

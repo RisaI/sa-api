@@ -25,5 +25,10 @@ namespace SAApi.Data
         public abstract Task<(object, object)> NextAsync();
         public abstract void ApplyXRange((object, object) xRange);
         public virtual Type QueryLeafXType() { return XType; }
+
+        public Models.PipelineSpecs GetSpecs()
+        {
+            return new Models.PipelineSpecs() { XType = XType, YType = YType };
+        }
     }
 }

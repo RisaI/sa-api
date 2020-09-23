@@ -49,7 +49,7 @@ namespace SAApi
     {
         public static async System.Threading.Tasks.Task Consume(this Data.IDataWriter writer, Data.Node node)
         {
-            writer.SetTypes(node.XType, node.YType);
+            await writer.SetTypes(node.XType, node.YType);
 
             while (await node.HasNextAsync())
             {

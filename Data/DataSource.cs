@@ -23,7 +23,7 @@ namespace SAApi.Data
             _Config = config;
         }
 
-        public abstract Task<Node> GetNode(string id, string variant);
+        public abstract Task<Node> GetNode(string id, string variant, Services.ResourceCache resCache);
         public abstract Task OnTick(IServiceScope scope);
     }
 }

@@ -6,7 +6,7 @@ namespace SAApi.Data
 {
     public interface IDataWriter
     {
-        void SetTypes(Type xType, Type yType);
-        Task Write<X,Y>(X x, Y y);
+        ValueTask SetTypes(Type xType, Type yType);
+        ValueTask Write<X,Y>(X x, Y y);
     }
 }

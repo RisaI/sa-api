@@ -27,10 +27,10 @@ namespace SAApi.Data.Sources
         public IEnumerable<DateTime> GetAvailableDates { get { return Directory.GetDirectories(DataPath).Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null)); } }
         public string GetPathFromDate(DateTime date) => Path.Combine(DataPath, $"PFM_{date.ToString(DirectoryDateFormat)}");
 
-        public override Task<Node> GetNode(string id, string variant)
+        public override Task<Node> GetNode(string id, string variant, Services.ResourceCache resCache)
         {
             var dataset = _Datasets.Find(d => d.Id == id);
-            return Task.FromResult<Node>(new HPDataNode(this, dataset, variant));
+            return Task.FromResult<Node>(new HPDataNode(this, dataset, variant, resCache));
         }
 
         private List<HPDataset> _temp = new List<HPDataset>();
@@ -156,13 +156,15 @@ namespace SAApi.Data.Sources
         public string Variant { get; private set; }
 
         private (DateTime, DateTime) SelectedRange;
+        private Services.ResourceCache resourceCache;
 
-        public HPDataNode(HPDataSource source, HPDataset set, string variant)
+        public HPDataNode(HPDataSource source, HPDataset set, string variant, Services.ResourceCache resCache)
             : base(set.XType, set.YType)
         {
             Source = source;
             Dataset = set;
             Variant = variant;
+            resourceCache = resCache;
         }
 
         private List<DateTime> AvailableDates;
@@ -199,44 +201,23 @@ namespace SAApi.Data.Sources
 
         private async Task PullToCache()
         {
-            using (var stream = new FileStream(Path.Combine(Source.GetPathFromDate(AvailableDates[0]), Dataset.ZipPath), FileMode.Open, FileAccess.Read))
-            using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, false))
-            {
-                var entry = zip.GetEntry(Dataset.FileEntry);
+            var csv = await resourceCache.GetCSVFileFromZipAsync(Path.Combine(Source.GetPathFromDate(AvailableDates[0]), Dataset.ZipPath), Dataset.FileEntry, ',', 6);
 
-                using (var fStream = entry.Open())
-                {
-                    await ReadColumnData(fStream, Variant, SelectedRange.Item1, SelectedRange.Item2);
-                }
+            var colIdx = Array.IndexOf(csv.First(), $"\"{Variant}\"");
+
+            foreach (var line in csv.Skip(1))
+            {
+                var date = DateTime.ParseExact(line[1].Trim('"'), HPDataSource.DateFormat, null);
+
+                if (date < SelectedRange.Item1)
+                    continue;
+                if (date > SelectedRange.Item2)
+                    break;
+
+                _Cached.Add((date, int.Parse(line[colIdx].Trim('"'))));
             }
 
             AvailableDates.RemoveAt(0);
-        }
-
-        async Task ReadColumnData(Stream stream, string column, DateTime from, DateTime to)
-        {
-            using (var reader = new StreamReader(stream))
-            {
-                for (int i = 0; i < 6; ++i)
-                    await reader.ReadLineAsync();
-
-                var colIdx = Array.IndexOf((await reader.ReadLineAsync()).Split(',').Select(a => a.Trim('"')).ToArray(), column);
-
-                while (!reader.EndOfStream)
-                {
-                    var line = await reader.ReadLineAsync();
-                    var cols = line.Split(',').Select(a => a.Trim('"')).ToArray();
-
-                    var date = DateTime.ParseExact(cols[1], HPDataSource.DateFormat, null);
-
-                    if (date < from)
-                        continue;
-                    if (date > to)
-                        break;
-
-                    _Cached.Add((date, int.Parse(cols[colIdx])));
-                }
-            }
         }
     }
 }

@@ -8,7 +8,7 @@ namespace SAApi.Models
         public string From { get; set; }
         public string To   { get; set; }
 
-        public NodeDescriptor Pipeline { get; set; }
+        public NodeDescriptor[] Pipelines { get; set; }
     }
 
     public sealed class NodeDescriptor

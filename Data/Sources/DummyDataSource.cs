@@ -50,7 +50,7 @@ namespace SAApi.Data.Sources
             };
         }
 
-        public override Task<Node> GetNode(string id, string variant)
+        public override Task<Node> GetNode(string id, string variant, Services.ResourceCache _)
         {
             var dataset = Datasets.First(d => d.Id == id) as DummyDataset;
             return Task.FromResult<Node>(new DummyNode((DateTime)dataset.AvailableXRange.Item1, dataset.Jump, dataset.AvailableXRange, dataset.Func));

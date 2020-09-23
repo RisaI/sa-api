@@ -17,11 +17,13 @@ namespace SAApi.Controllers
     {
         private readonly ILogger _Logger;
         private readonly Services.DataSourceService _DataSources;
+        private readonly Services.ResourceCache _ResCache;
     
-        public DataController(ILogger<DataController> logger, Services.DataSourceService dataSources)
+        public DataController(ILogger<DataController> logger, Services.DataSourceService dataSources, Services.ResourceCache resCache)
         {
             _Logger = logger;
             _DataSources = dataSources;
+            _ResCache = resCache;
         }
     
         [HttpGet]
@@ -51,62 +53,54 @@ namespace SAApi.Controllers
         [HttpPost]
         public async Task GetPipelineData([FromBody] FetchDataRequest body)
         {
+            Response.ContentType = "application/octet-stream";
             var watch = new Stopwatch();
 
             watch.Start();
-            var pipeline = await Data.Pipes.PipelineCompiler.Compile(
-                body.Pipeline,
-                _DataSources
-            );
+            var pipelines = await Task.WhenAll(body.Pipelines.Select(p =>
+                Data.Pipes.PipelineCompiler.Compile(p, _DataSources, _ResCache)));
             watch.Stop();
 
-            _Logger.LogDebug($"Compiled the pipeline in {watch.ElapsedMilliseconds} ms.");
+            _Logger.LogDebug($"Compiled the pipelines in {watch.ElapsedMilliseconds} ms.");
 
             watch.Restart();
             // Parse and apply X range
-            pipeline.ApplyXRange(
-                Helper.ParseRange(
-                    pipeline.QueryLeafXType(),
-                    body.From,
-                    body.To
-                )
-            );
+            foreach (var pipeline in pipelines)
+            {
+                pipeline.ApplyXRange(
+                    Helper.ParseRange(
+                        pipeline.QueryLeafXType(),
+                        body.From,
+                        body.To
+                    )
+                );
+            }
             watch.Stop();
 
             _Logger.LogDebug($"Applied an x range to the pipeline in {watch.ElapsedMilliseconds} ms.");
 
-            using (var encoder = new Data.EncodeDataStream(Response.Body))
+            using (var encoder = new Data.BinaryDataBuffer())
             {
-                // Allow synchronous IO for this request
-                // TODO: properly implement asynchronous serialization
-                var syncIOFeature = HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpBodyControlFeature>();
-                if (syncIOFeature != null)
-                {
-                    syncIOFeature.AllowSynchronousIO = true;
-                }
-                
                 // Drain the pipeline into a stream
                 watch.Restart();
-                await encoder.Consume(pipeline);
+                foreach (var pipeline in pipelines)
+                {
+                    await encoder.Consume(pipeline);
+                    await encoder.FlushAsync(Response.Body);
+                }
                 watch.Stop();
                 _Logger.LogDebug($"Consumed the pipeline in {watch.ElapsedMilliseconds} ms.");
-
-                await Response.CompleteAsync();
             }
+
+            await Response.CompleteAsync();
         }
 
         [HttpPost("specs")]
         public async Task<IActionResult> GetPipelineSpecs([FromBody] FetchDataRequest body)
         {
-            var pipeline = await Data.Pipes.PipelineCompiler.Compile(
-                body.Pipeline,
-                _DataSources
+            return Ok(
+                (await Task.WhenAll(body.Pipelines.Select(p => Data.Pipes.PipelineCompiler.Compile(p, _DataSources, _ResCache)))).Select(p => p.GetSpecs())
             );
-
-            return Ok(new PipelineSpecs {
-                XType = pipeline.XType,
-                YType = pipeline.YType,
-            });
         }
     }
 }

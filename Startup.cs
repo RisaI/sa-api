@@ -27,9 +27,17 @@ namespace SAApi
         {
             services.AddSingleton<Services.DataSourceService>();
             services.AddHostedService<Services.DataSourceService>(provider => provider.GetService<Services.DataSourceService>());
+            services.AddScoped<Services.ResourceCache>();
 
             services.AddControllers();
             services.AddApiVersioning();
+            services.AddResponseCompression(opts => {
+                opts.EnableForHttps = true;
+                opts.MimeTypes = new string[] {
+                    "application/json",
+                    "application/octet-stream"
+                };
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -44,6 +52,7 @@ namespace SAApi
             app.UseRouting();
             app.UseAuthorization();
 
+            app.UseResponseCompression();
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();

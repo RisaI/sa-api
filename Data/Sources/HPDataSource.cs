@@ -54,22 +54,70 @@ namespace SAApi.Data.Sources
             await ScanZip(latestDir, "PhyProc_dat.ZIP", _temp, availableRange);
             await ScanZip(latestDir, "Port_dat.ZIP", _temp, availableRange);
 
-            var dict = new Dictionary<string, List<string>>();
-            foreach (var date in dates)
             {
-                var path = Path.Combine(DataPath, $"PFM_{date.ToString(DirectoryDateFormat)}");
+                var dict = new Dictionary<string, List<string>>();
+                foreach (var date in dates)
+                {
+                    var path = GetPathFromDate(date);
 
-                await ScanZipVariants(path, "LDEV_Short.zip", dict);
-                await ScanZipVariants(path, "PhyMPU_dat.ZIP", dict);
-                await ScanZipVariants(path, "PhyPG_dat.ZIP", dict);
-                await ScanZipVariants(path, "PhyProc_Cache_dat.ZIP", dict);
-                await ScanZipVariants(path, "PhyProc_dat.ZIP", dict);
-                await ScanZipVariants(path, "Port_dat.ZIP", dict);
+                    await ScanZipVariants(path, "LDEV_Short.zip", dict);
+                    await ScanZipVariants(path, "PhyMPU_dat.ZIP", dict);
+                    await ScanZipVariants(path, "PhyPG_dat.ZIP", dict);
+                    await ScanZipVariants(path, "PhyProc_Cache_dat.ZIP", dict);
+                    await ScanZipVariants(path, "PhyProc_dat.ZIP", dict);
+                    await ScanZipVariants(path, "Port_dat.ZIP", dict);
+                }
+
+                foreach (var set in _temp)
+                {
+                    set.Variants = dict[set.FileEntry].ToArray();
+                }
             }
 
-            foreach (var set in _temp)
+            // Load configuration
+            using (var file = new FileStream(Path.Combine(latestDir, "config.zip"), FileMode.Open, FileAccess.Read))
+            using (var zip = new ZipArchive(file, ZipArchiveMode.Read))
             {
-                set.Variants = dict[set.FileEntry].ToArray();
+                var ldevs = new List<LDEVInfo>();
+                using (var csvFile = zip.GetEntry("LdevInfo.csv").Open())
+                using (var reader = new StreamReader(csvFile))
+                {
+                    await reader.ReadLineAsync();
+                    await reader.ReadLineAsync(); // Skip first two lines
+
+                    while (!reader.EndOfStream)
+                        ldevs.Add(new LDEVInfo((await reader.ReadLineAsync()).Split(',')));
+                }
+
+                var ldevHostsMap = ldevs.ToDictionary(k => k.Id, v => new List<(string, string)>());
+
+                using (var csvFile = zip.GetEntry("LunInfo.csv").Open())
+                using (var reader = new StreamReader(csvFile))
+                {
+                    await reader.ReadLineAsync();
+                    await reader.ReadLineAsync();
+                    
+                    while (!reader.EndOfStream)
+                    {
+                        var cols = (await reader.ReadLineAsync()).Split(',');
+                        if (string.IsNullOrWhiteSpace(cols[5]) || !ldevHostsMap.ContainsKey(cols[5]))
+                            continue;
+                        
+                        var ldev = ldevHostsMap[cols[5]];
+                        ldev.Add((cols[0], cols[1]));
+                    }
+
+                    foreach (var ldev in ldevs)
+                        ldev.HostNicknames = ldevHostsMap[ldev.Id].Select(v => v.Item2).Distinct().ToArray();
+                }
+
+                using (var csvFile = zip.GetEntry("WwnInfo.csv").Open())
+                using (var reader = new StreamReader(csvFile))
+                {
+                    await reader.ReadLineAsync();
+                    await reader.ReadLineAsync();
+
+                }
             }
 
             // Swapnout temp a ostrej
@@ -218,6 +266,48 @@ namespace SAApi.Data.Sources
             }
 
             AvailableDates.RemoveAt(0);
+        }
+    }
+
+    public class LDEVInfo
+    {
+        public string ECCGroup { get; set; }
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public float Size { get; set; }
+        public string MPU { get; set; }
+        public string PoolName { get; set; }
+
+        public string[] Ports { get; set; }
+        public string[] WWNs { get; set; }
+        public string[] HostNicknames { get; set; }
+
+        public LDEVInfo(string[] csvColumns)
+        {
+            ECCGroup = csvColumns[0];
+            Id = csvColumns[1];
+            Name = csvColumns[2];
+            Size = float.Parse(csvColumns[7]);
+            MPU = csvColumns[15];
+            PoolName = csvColumns[18];
+        }
+    }
+
+    public class WWNInfo
+    {
+        public string Port { get; set; }
+        public string HostGroup { get; set; }
+        public string WWN { get; set; }
+        public string Nickname { get; set; }
+        public string Location { get; set; }
+
+        public WWNInfo(string[] csvColumns)
+        {
+            Port = csvColumns[0];
+            HostGroup = csvColumns[1];
+            WWN = csvColumns[4];
+            Nickname = csvColumns[5];
+            Location = csvColumns[7];
         }
     }
 }

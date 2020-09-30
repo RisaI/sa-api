@@ -34,6 +34,7 @@ namespace SAApi.Data.Sources
         }
 
         private List<HPDataset> _temp = new List<HPDataset>();
+        private List<LDEVInfo> LDEVs = new List<LDEVInfo>();
         public override async Task OnTick(IServiceScope scope)
         {
             var dirs = Directory.GetDirectories(DataPath);
@@ -78,7 +79,7 @@ namespace SAApi.Data.Sources
             using (var file = new FileStream(Path.Combine(latestDir, "config.zip"), FileMode.Open, FileAccess.Read))
             using (var zip = new ZipArchive(file, ZipArchiveMode.Read))
             {
-                var ldevs = new List<LDEVInfo>();
+                LDEVs.Clear();
                 using (var csvFile = zip.GetEntry("LdevInfo.csv").Open())
                 using (var reader = new StreamReader(csvFile))
                 {
@@ -86,14 +87,15 @@ namespace SAApi.Data.Sources
                     await reader.ReadLineAsync(); // Skip first two lines
 
                     while (!reader.EndOfStream)
-                        ldevs.Add(new LDEVInfo((await reader.ReadLineAsync()).Split(',')));
+                        LDEVs.Add(new LDEVInfo((await reader.ReadLineAsync()).Split(',')));
                 }
 
-                var ldevHostsMap = ldevs.ToDictionary(k => k.Id, v => new List<(string, string)>());
-
+                var hostWWNs = new Dictionary<string, List<WWNInfo>>();
                 using (var csvFile = zip.GetEntry("LunInfo.csv").Open())
                 using (var reader = new StreamReader(csvFile))
                 {
+                    var ldevHostsMap = LDEVs.ToDictionary(k => k.Id, v => new List<(string, string)>());
+
                     await reader.ReadLineAsync();
                     await reader.ReadLineAsync();
                     
@@ -104,20 +106,39 @@ namespace SAApi.Data.Sources
                             continue;
                         
                         var ldev = ldevHostsMap[cols[5]];
-                        ldev.Add((cols[0], cols[1]));
+                        var host = (cols[0], cols[1]);
+                        var hostAlias = $"{host.Item1}:{host.Item2}";
+
+                        if (!hostWWNs.ContainsKey(hostAlias))
+                            hostWWNs.Add(hostAlias, new List<WWNInfo>());
+                        
+                        ldev.Add(host);
                     }
 
-                    foreach (var ldev in ldevs)
-                        ldev.HostNicknames = ldevHostsMap[ldev.Id].Select(v => v.Item2).Distinct().ToArray();
+                    foreach (var ldev in LDEVs)
+                        ldev.HostPorts = ldevHostsMap[ldev.Id].Distinct().ToArray();
                 }
 
+                var wwns = new List<WWNInfo>();
                 using (var csvFile = zip.GetEntry("WwnInfo.csv").Open())
                 using (var reader = new StreamReader(csvFile))
                 {
                     await reader.ReadLineAsync();
-                    await reader.ReadLineAsync();
+                    await reader.ReadLineAsync(); // Skip first two lines
 
+                    while (!reader.EndOfStream)
+                    {
+                        var wwn = new WWNInfo((await reader.ReadLineAsync()).Split(','));
+                        var host = $"{wwn.Port}:{wwn.HostGroup}";
+                        wwns.Add(wwn);
+
+                        if (hostWWNs.ContainsKey(host))
+                            hostWWNs[host].Add(wwn);
+                    }
                 }
+
+                foreach (var ldev in LDEVs)
+                    ldev.WWNs = ldev.HostPorts.SelectMany(hp => hostWWNs[$"{hp.Item1}:{hp.Item2}"]).ToArray();
             }
 
             // Swapnout temp a ostrej
@@ -278,9 +299,12 @@ namespace SAApi.Data.Sources
         public string MPU { get; set; }
         public string PoolName { get; set; }
 
-        public string[] Ports { get; set; }
-        public string[] WWNs { get; set; }
-        public string[] HostNicknames { get; set; }
+        public IEnumerable<string> Ports { get { return WWNs.Select(w => w.Location); } }
+        public IEnumerable<string> WWNNames { get { return WWNs.Select(w => w.Nickname); } }
+        public IEnumerable<string> HostNicknames { get { return HostPorts.Select(h => h.Item2).Distinct(); } }
+
+        public (string, string)[] HostPorts;
+        public WWNInfo[] WWNs;
 
         public LDEVInfo(string[] csvColumns)
         {

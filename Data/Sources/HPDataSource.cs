@@ -12,6 +12,7 @@ namespace SAApi.Data.Sources
     public class HPDataSource : DataSource
     {
         public const string DateFormat = "yyyy/MM/dd HH:mm", DirectoryDateFormat = "yyyyMMdd";
+        public static readonly string[] DetectedPatterns = new string[] { "LDEV_*.zip", "Phy*_dat.ZIP", "Port_*.ZIP" };
 
         string DataPath { get { return _Config["path"]; } }
 
@@ -48,12 +49,8 @@ namespace SAApi.Data.Sources
 
             var latestDir = Path.Combine(DataPath, $"PFM_{nearestDate.ToString(DirectoryDateFormat)}");
 
-            await ScanZip(latestDir, "LDEV_Short.zip", _temp, availableRange);
-            await ScanZip(latestDir, "PhyMPU_dat.ZIP", _temp, availableRange);
-            await ScanZip(latestDir, "PhyPG_dat.ZIP", _temp, availableRange);
-            await ScanZip(latestDir, "PhyProc_Cache_dat.ZIP", _temp, availableRange);
-            await ScanZip(latestDir, "PhyProc_dat.ZIP", _temp, availableRange);
-            await ScanZip(latestDir, "Port_dat.ZIP", _temp, availableRange);
+            foreach (var fileName in DetectedPatterns.SelectMany(p => Directory.GetFiles(latestDir, p)))
+                await ScanZip(Path.GetDirectoryName(fileName), Path.GetFileName(fileName), _temp, availableRange);
 
             {
                 var dict = new Dictionary<string, List<string>>();
@@ -61,12 +58,8 @@ namespace SAApi.Data.Sources
                 {
                     var path = GetPathFromDate(date);
 
-                    await ScanZipVariants(path, "LDEV_Short.zip", dict);
-                    await ScanZipVariants(path, "PhyMPU_dat.ZIP", dict);
-                    await ScanZipVariants(path, "PhyPG_dat.ZIP", dict);
-                    await ScanZipVariants(path, "PhyProc_Cache_dat.ZIP", dict);
-                    await ScanZipVariants(path, "PhyProc_dat.ZIP", dict);
-                    await ScanZipVariants(path, "Port_dat.ZIP", dict);
+                    foreach (var fileName in DetectedPatterns.SelectMany(p => Directory.GetFiles(path, p)))
+                        await ScanZipVariants(Path.GetDirectoryName(fileName), Path.GetFileName(fileName), dict);
                 }
 
                 foreach (var set in _temp)
@@ -299,9 +292,10 @@ namespace SAApi.Data.Sources
         public string MPU { get; set; }
         public string PoolName { get; set; }
 
-        public IEnumerable<string> Ports { get { return WWNs.Select(w => w.Location); } }
-        public IEnumerable<string> WWNNames { get { return WWNs.Select(w => w.Nickname); } }
-        public IEnumerable<string> HostNicknames { get { return HostPorts.Select(h => h.Item2).Distinct(); } }
+        public IEnumerable<string> Hostnames { get { return HostPorts.Select(h => h.Item2).Distinct(); } }
+        public IEnumerable<string> Ports { get { return HostPorts.Select(w => w.Item1); } }
+        public IEnumerable<string> WWNNames { get { return WWNs.Select(w => w.WWN); } }
+        public IEnumerable<string> WWNNicknames { get { return WWNs.Select(w => w.Nickname); } }
 
         public (string, string)[] HostPorts;
         public WWNInfo[] WWNs;

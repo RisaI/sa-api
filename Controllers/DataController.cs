@@ -38,6 +38,17 @@ namespace SAApi.Controllers
             return Ok(_DataSources.GetSource(source));
         }
 
+        [HttpPost("{sourceId}/features/{feature}")]
+        public async Task<ActionResult<object>> PostFeature([FromRoute] string sourceId, [FromRoute] string feature)
+        {
+            var source = _DataSources.GetSource(sourceId);
+
+            if (source == null)
+                return NotFound();
+
+            return Ok(await source.ActivateFeatureAsync(feature, Request.Body));
+        }
+
         [HttpGet("{sourceId}/{setId}")]
         public ActionResult<Data.Dataset> GetDataset([FromRoute] string sourceId, [FromRoute] string setId)
         {

@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -13,6 +14,7 @@ namespace SAApi.Data.Sources
         private static Random _Random = new Random();
 
         public override IEnumerable<Dataset> Datasets { get; }
+        public override IEnumerable<string> Features { get { return Enumerable.Empty<string>(); } }
         private float[] SampleData;
 
         public DummyDataSource(string id, IConfigurationSection config) : base(id, "Dummy Data Source", config)
@@ -59,6 +61,11 @@ namespace SAApi.Data.Sources
         public override Task OnTick(IServiceScope scope)
         {
             return Task.CompletedTask;
+        }
+
+        public override Task<object> ActivateFeatureAsync(string feature, Stream body)
+        {
+            throw new NotImplementedException();
         }
 
         public class DummyDataset : Dataset

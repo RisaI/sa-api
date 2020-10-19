@@ -9,6 +9,7 @@ namespace SAApi.Data
     public abstract class DataSource : IIdentified
     {
         public abstract IEnumerable<Dataset> Datasets { get; }
+        public abstract IEnumerable<string> Features { get; }
 
         public string Id { get; private set; }
         public string Name { get { return _Config["name"] ?? _DefaultName; } }
@@ -25,5 +26,7 @@ namespace SAApi.Data
 
         public abstract Task<Node> GetNode(string id, string variant, Services.ResourceCache resCache);
         public abstract Task OnTick(IServiceScope scope);
+
+        public abstract Task<object> ActivateFeatureAsync(string feature, System.IO.Stream body);
     }
 }

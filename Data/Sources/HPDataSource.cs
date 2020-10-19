@@ -24,6 +24,8 @@ namespace SAApi.Data.Sources
 
         private List<HPDataset> _Datasets = new List<HPDataset>();
         public override IEnumerable<Dataset> Datasets => _Datasets;
+        private string[] _Features = new string[] { "ldev_map" };
+        public override IEnumerable<string> Features => _Features;
 
         public IEnumerable<DateTime> GetAvailableDates { get { return Directory.GetDirectories(DataPath).Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null)); } }
         public string GetPathFromDate(DateTime date) => Path.Combine(DataPath, $"PFM_{date.ToString(DirectoryDateFormat)}");
@@ -199,6 +201,23 @@ namespace SAApi.Data.Sources
                 return (await reader.ReadLineAsync()).Split(',').Select(a => a.Trim('"'));
             }
         }
+
+        public override async Task<object> ActivateFeatureAsync(string feature, Stream body)
+        {
+            if (feature == "ldev_map")
+            {
+                var @params = await System.Text.Json.JsonSerializer.DeserializeAsync<LDEVMapRequest>(body);
+
+                return LDEVs.Find(ldev => ldev.Id == @params.Id);
+            }
+            else
+                throw new NotImplementedException();
+        }
+    }
+
+    class LDEVMapRequest
+    {
+        public string Id { get; set; }
     }
 
     public class HPDataset : Dataset

@@ -89,7 +89,7 @@ namespace SAApi.Data.Sources
                 using (var csvFile = zip.GetEntry("LunInfo.csv").Open())
                 using (var reader = new StreamReader(csvFile))
                 {
-                    var ldevHostsMap = LDEVs.ToDictionary(k => k.Id, v => new List<(string, string)>());
+                    var ldevHostsMap = LDEVs.ToDictionary(k => k.Id, v => new List<HostPort>());
 
                     await reader.ReadLineAsync();
                     await reader.ReadLineAsync();
@@ -101,8 +101,8 @@ namespace SAApi.Data.Sources
                             continue;
                         
                         var ldev = ldevHostsMap[cols[5]];
-                        var host = (cols[0], cols[1]);
-                        var hostAlias = $"{host.Item1}:{host.Item2}";
+                        var host = new HostPort(cols[1], cols[0]);
+                        var hostAlias = $"{host.Hostgroup}:{host.Port}";
 
                         if (!hostWWNs.ContainsKey(hostAlias))
                             hostWWNs.Add(hostAlias, new List<WWNInfo>());
@@ -124,7 +124,7 @@ namespace SAApi.Data.Sources
                     while (!reader.EndOfStream)
                     {
                         var wwn = new WWNInfo((await reader.ReadLineAsync()).Split(','));
-                        var host = $"{wwn.Port}:{wwn.HostGroup}";
+                        var host = $"{wwn.Hostgroup}:{wwn.Port}";
                         wwns.Add(wwn);
 
                         if (hostWWNs.ContainsKey(host))
@@ -133,7 +133,7 @@ namespace SAApi.Data.Sources
                 }
 
                 foreach (var ldev in LDEVs)
-                    ldev.WWNs = ldev.HostPorts.SelectMany(hp => hostWWNs[$"{hp.Item1}:{hp.Item2}"]).ToArray();
+                    ldev.Wwns = ldev.HostPorts.SelectMany(hp => hostWWNs[$"{hp.Hostgroup}:{hp.Port}"]).ToArray();
             }
 
             // Swapnout temp a ostrej
@@ -207,8 +207,8 @@ namespace SAApi.Data.Sources
             if (feature == "ldev_map")
             {
                 var @params = await System.Text.Json.JsonSerializer.DeserializeAsync<LDEVMapRequest>(body);
-
-                return LDEVs.Find(ldev => ldev.Id == @params.Id);
+                var ldev = LDEVs.Find(ldev => ldev.Id.Equals(@params.Id.Substring(0, 8), StringComparison.InvariantCultureIgnoreCase));
+                return ldev;
             }
             else
                 throw new NotImplementedException();
@@ -217,7 +217,7 @@ namespace SAApi.Data.Sources
 
     class LDEVMapRequest
     {
-        public string Id { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("id")] public string Id { get; set; }
     }
 
     public class HPDataset : Dataset
@@ -311,13 +311,13 @@ namespace SAApi.Data.Sources
         public string MPU { get; set; }
         public string PoolName { get; set; }
 
-        public IEnumerable<string> Hostnames { get { return HostPorts.Select(h => h.Item2).Distinct(); } }
-        public IEnumerable<string> Ports { get { return HostPorts.Select(w => w.Item1); } }
-        public IEnumerable<string> WWNNames { get { return WWNs.Select(w => w.WWN); } }
-        public IEnumerable<string> WWNNicknames { get { return WWNs.Select(w => w.Nickname); } }
+        // public IEnumerable<string> Hostnames { get { return HostPorts.Select(h => h.Hostname).Distinct(); } }
+        // public IEnumerable<string> Ports { get { return HostPorts.Select(w => w.Port); } }
+        // public IEnumerable<string> WwnNames { get { return Wwns.Select(w => w.WWN); } }
+        // public IEnumerable<string> WwnNicknames { get { return Wwns.Select(w => w.Nickname); } }
 
-        public (string, string)[] HostPorts;
-        public WWNInfo[] WWNs;
+        public HostPort[] HostPorts { get; set; }
+        public WWNInfo[] Wwns { get; set; }
 
         public LDEVInfo(string[] csvColumns)
         {
@@ -330,19 +330,32 @@ namespace SAApi.Data.Sources
         }
     }
 
+    public class HostPort
+    {
+        public string Hostgroup { get; set; }
+        public string Port { get; set; }
+
+        public HostPort() { }
+        public HostPort(string hostgroup, string port)
+        {
+            Hostgroup = hostgroup;
+            Port = port;
+        }
+    }
+
     public class WWNInfo
     {
         public string Port { get; set; }
-        public string HostGroup { get; set; }
-        public string WWN { get; set; }
+        public string Hostgroup { get; set; }
+        public string Wwn { get; set; }
         public string Nickname { get; set; }
         public string Location { get; set; }
 
         public WWNInfo(string[] csvColumns)
         {
             Port = csvColumns[0];
-            HostGroup = csvColumns[1];
-            WWN = csvColumns[4];
+            Hostgroup = csvColumns[1];
+            Wwn = csvColumns[4];
             Nickname = csvColumns[5];
             Location = csvColumns[7];
         }

@@ -38,6 +38,16 @@ namespace SAApi.Data.Pipes
 
             return (x, Expression.Evaluate());
         }
+
+        public override async Task<(object X, object Y)> PeekAsync()
+        {
+            var (x, y) = await Children.First().PeekAsync();
+
+            Expression.Parameters["x"] = x;
+            Expression.Parameters["y"] = y;
+
+            return (x, Expression.Evaluate());
+        }
     }
 
     public class ExpressionOptions

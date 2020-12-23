@@ -119,12 +119,17 @@ namespace SAApi.Data.Sources
 
             public override Task<(object, object)> NextAsync()
             {
-                (object, object) val = (_Cursor, _Func.Invoke(_Cursor, _Idx));
+                var val = PeekAsync();
 
                 _Cursor += _Jump;
                 ++_Idx;
 
-                return Task.FromResult(val);
+                return val;
+            }
+
+            public override Task<(object X, object Y)> PeekAsync()
+            {
+                return Task.FromResult<(object, object)>((_Cursor, _Func.Invoke(_Cursor, _Idx)));
             }
         }
     }

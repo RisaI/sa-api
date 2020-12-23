@@ -13,10 +13,10 @@ namespace SAApi.Data.Pipes
         static Type[] SupportedYTypes = new Type[] { typeof(int), typeof(float) };
 
         Common.RotatingList<(object, object)> rotator;
-        public DifferentiationPipe(Node parent, Dictionary<string, object> opts) : base(parent.XType, typeof(float), parent)
+        public DifferentiationPipe(Node child, Dictionary<string, object> opts) : base(child.XType, typeof(float), child)
         {
             rotator = new Common.RotatingList<(object, object)>(3);
-            SetTypes(parent.XType, parent.YType);
+            SetTypes(child.XType, child.YType);
         }
 
         Delegate xDiff, yDiff;
@@ -64,17 +64,33 @@ namespace SAApi.Data.Pipes
 
         public override async Task<(object, object)> NextAsync()
         {
+            var val = await PeekAsync();
+
+            await Children.First().NextAsync();
+            if (!(await Children.First().HasNextAsync()))
+                last = true;
+
+            peeked = false;
+
+            return val;
+        }
+
+        bool peeked = false;
+        public override async Task<(object X, object Y)> PeekAsync()
+        {
             if (_Written < 1)
                 await PullFirstAsync();
 
             if (!last)
             {
-                rotator.Push(await Children.First().NextAsync());
-
-                if (!(await Children.First().HasNextAsync()))
-                    last = true;
+                if (!peeked)
+                {
+                    rotator.Push(await Children.First().PeekAsync());
+                    ++_Written;
+                    peeked = true;
+                }
                 
-                if (+_Written++ == 1)
+                if (+_Written++ == 2)
                 {
                     var (x, y) = rotator[0];
                     var (pX, pY) = rotator[-1];

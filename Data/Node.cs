@@ -22,8 +22,10 @@ namespace SAApi.Data
         }
         
         public abstract Task<bool> HasNextAsync();
-        public abstract Task<(object, object)> NextAsync();
-        public abstract void ApplyXRange((object, object) xRange);
+        public abstract Task<(object X, object Y)> NextAsync();
+        public abstract Task<(object X, object Y)> PeekAsync();
+
+        public abstract void ApplyXRange((object From, object To) xRange);
         public virtual Type QueryLeafXType() { return XType; }
 
         public Models.PipelineSpecs GetSpecs()

@@ -273,11 +273,16 @@ namespace SAApi.Data.Sources
 
         public override Task<(object, object)> NextAsync()
         {
-            var val = _Cached[0];
+            var val = PeekAsync();
 
             _Cached.RemoveAt(0);
 
-            return Task.FromResult<(object, object)>(val);
+            return val;
+        }
+
+        public override Task<(object, object)> PeekAsync()
+        {
+            return Task.FromResult<(object, object)>(_Cached[0]);
         }
 
         private async Task PullToCache()

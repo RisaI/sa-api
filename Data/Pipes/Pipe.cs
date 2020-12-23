@@ -29,7 +29,7 @@ namespace SAApi.Data.Pipes
                 .Where(t => t.Item2 != null);
         }
 
-        public override void ApplyXRange((object, object) xRange)
+        public override void ApplyXRange((object From, object To) xRange)
         {
             foreach (var child in Children)
                 child.ApplyXRange(xRange);

@@ -24,7 +24,10 @@ namespace SAApi.Data
         [JsonConverter(typeof(RangeTupleConverter))]
         public (object, object) AvailableXRange { get; set; }
 
+        [JsonIgnore]
         public string[] Variants { get; set; }
+
+        public int VariantCount => Variants?.Length ?? 1;
 
         public Dataset(string id, string name, string description, IIdentified source, Type xType, Type yType, (object, object) xRange, params string[] variants)
         {

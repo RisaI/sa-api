@@ -61,6 +61,18 @@ namespace SAApi.Controllers
             return Ok(set);
         }
 
+        [HttpGet("{sourceId}/{setId}/variants")]
+        public ActionResult<Data.Dataset> GetVariants([FromRoute] string sourceId, [FromRoute] string setId)
+        {
+            var source = _DataSources.GetSource(sourceId);
+            var set = source?.Datasets?.FirstOrDefault(s => s.Id == setId);
+
+            if (source == null || set == null)
+                return NotFound();
+
+            return Ok(set.Variants);
+        }
+
         [HttpPost]
         public async Task GetPipelineData([FromBody] FetchDataRequest body)
         {

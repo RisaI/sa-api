@@ -41,35 +41,38 @@ namespace SAApi.Services
                 return list;
             }
         }
-        public async Task<IEnumerable<string[]>> GetCSVFileFromZipAsync(string zipFile, string filename, char delimiter, int skipLines = 0)
+        public IEnumerable<string[]> GetCSVFileFromZipAsync(string zipFile, string filename, char delimiter, int skipLines = 0)
         {
-            if (CSVs.ContainsKey($"{zipFile}:{filename}"))
-                return CSVs[$"{zipFile}:{filename}"];
-
-            using (var stream = new FileStream(zipFile, FileMode.Open, FileAccess.Read))
-            using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, false))
+            lock (CSVs)
             {
-                var entry = zip.GetEntry(filename);
+                if (CSVs.ContainsKey($"{zipFile}:{filename}"))
+                    return CSVs[$"{zipFile}:{filename}"];
 
-                using (var fStream = entry.Open())
-                using (var reader = new StreamReader(fStream))
+                using (var stream = new FileStream(zipFile, FileMode.Open, FileAccess.Read))
+                using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, false))
                 {
-                    var list = new List<string[]>();
+                    var entry = zip.GetEntry(filename);
 
-                    for (int i = 0; i < skipLines && !reader.EndOfStream; ++i)
-                        await reader.ReadLineAsync();
-
-                    while (!reader.EndOfStream)
+                    using (var fStream = entry.Open())
+                    using (var reader = new StreamReader(fStream))
                     {
-                        var line = (await reader.ReadLineAsync()).Trim();
-                        if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
-                            continue;
+                        var list = new List<string[]>();
 
-                        list.Add(line.Split(delimiter));
+                        for (int i = 0; i < skipLines && !reader.EndOfStream; ++i)
+                            reader.ReadLine();
+
+                        while (!reader.EndOfStream)
+                        {
+                            var line = reader.ReadLine().Trim();
+                            if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
+                                continue;
+
+                            list.Add(line.Split(delimiter));
+                        }
+
+                        CSVs.Add($"{zipFile}:{filename}", list);
+                        return list;
                     }
-
-                    CSVs.Add($"{zipFile}:{filename}", list);
-                    return list;
                 }
             }
         }

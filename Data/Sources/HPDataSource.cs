@@ -285,9 +285,9 @@ namespace SAApi.Data.Sources
             return Task.FromResult<(object, object)>(_Cached[0]);
         }
 
-        private async Task PullToCache()
+        private Task PullToCache()
         {
-            var csv = await resourceCache.GetCSVFileFromZipAsync(Path.Combine(Source.GetPathFromDate(AvailableDates[0]), Dataset.ZipPath), Dataset.FileEntry, ',', 6);
+            var csv = resourceCache.GetCSVFileFromZipAsync(Path.Combine(Source.GetPathFromDate(AvailableDates[0]), Dataset.ZipPath), Dataset.FileEntry, ',', 6);
 
             var colIdx = Array.IndexOf(csv.First(), $"\"{Variant}\"");
 
@@ -304,6 +304,8 @@ namespace SAApi.Data.Sources
             }
 
             AvailableDates.RemoveAt(0);
+
+            return Task.CompletedTask;
         }
     }
 

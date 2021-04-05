@@ -11,7 +11,7 @@ namespace SAApi.Data.Sources
 {
     public class HPDataSource : DataSource
     {
-        public const string DateFormat = "yyyy/MM/dd HH:mm", DirectoryDateFormat = "yyyyMMdd";
+        public const string DateFormat = "yyyy/MM/dd HH:mm", DirectoryDateFormat = "yyyyMMdd", LdevMapFeature = "ldev_map";
         public static readonly string[] DetectedPatterns = new string[] { "LDEV_*.zip", "Phy*_dat.ZIP", "Port_*.ZIP" };
 
         string DataPath { get { return _Config["path"]; } }
@@ -23,8 +23,9 @@ namespace SAApi.Data.Sources
         }
 
         private List<HPDataset> _Datasets = new List<HPDataset>();
+        private string[] _Features = new string[0];
+
         public override IEnumerable<Dataset> Datasets => _Datasets;
-        private string[] _Features = new string[] { "ldev_map" };
         public override IEnumerable<string> Features => _Features;
 
         public IEnumerable<DateTime> GetAvailableDates { get { return Directory.GetDirectories(DataPath).Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null)); } }
@@ -70,11 +71,40 @@ namespace SAApi.Data.Sources
                 }
             }
 
+
+            var configs = new string[] {
+                Path.Combine(latestDir, "config.zip"),
+                Path.Combine(DataPath, "config.zip"),
+            };
+            var availableConf = configs.FirstOrDefault(p => File.Exists(p));
+
+            if (availableConf != null)
+            {
+                this.LDEVs = await LoadConfig(availableConf);
+                _Features = new string[] { LdevMapFeature };
+            }
+            else
+            {
+                _Features = new string[0];
+            }
+
+            // Swapnout temp a ostrej
+            {
+                var a = _Datasets;
+                _Datasets = _temp;
+                _temp = a;
+                _temp.Clear();
+            }
+        }
+
+        static async Task<List<LDEVInfo>> LoadConfig(string path)
+        {
+            List<LDEVInfo> ldevs = new List<LDEVInfo>();
+
             // Load configuration
-            using (var file = new FileStream(Path.Combine(latestDir, "config.zip"), FileMode.Open, FileAccess.Read))
+            using (var file = new FileStream(path, FileMode.Open, FileAccess.Read))
             using (var zip = new ZipArchive(file, ZipArchiveMode.Read))
             {
-                LDEVs.Clear();
                 using (var csvFile = zip.GetEntry("LdevInfo.csv").Open())
                 using (var reader = new StreamReader(csvFile))
                 {
@@ -82,14 +112,14 @@ namespace SAApi.Data.Sources
                     await reader.ReadLineAsync(); // Skip first two lines
 
                     while (!reader.EndOfStream)
-                        LDEVs.Add(new LDEVInfo((await reader.ReadLineAsync()).Split(',')));
+                        ldevs.Add(new LDEVInfo((await reader.ReadLineAsync()).Split(',')));
                 }
 
                 var hostWWNs = new Dictionary<string, List<WWNInfo>>();
                 using (var csvFile = zip.GetEntry("LunInfo.csv").Open())
                 using (var reader = new StreamReader(csvFile))
                 {
-                    var ldevHostsMap = LDEVs.ToDictionary(k => k.Id, v => new List<HostPort>());
+                    var ldevHostsMap = ldevs.ToDictionary(k => k.Id, v => new List<HostPort>());
 
                     await reader.ReadLineAsync();
                     await reader.ReadLineAsync();
@@ -110,7 +140,7 @@ namespace SAApi.Data.Sources
                         ldev.Add(host);
                     }
 
-                    foreach (var ldev in LDEVs)
+                    foreach (var ldev in ldevs)
                         ldev.HostPorts = ldevHostsMap[ldev.Id].Distinct().ToArray();
                 }
 
@@ -132,17 +162,11 @@ namespace SAApi.Data.Sources
                     }
                 }
 
-                foreach (var ldev in LDEVs)
+                foreach (var ldev in ldevs)
                     ldev.Wwns = ldev.HostPorts.SelectMany(hp => hostWWNs[$"{hp.Hostgroup}:{hp.Port}"]).ToArray();
             }
 
-            // Swapnout temp a ostrej
-            {
-                var a = _Datasets;
-                _Datasets = _temp;
-                _temp = a;
-                _temp.Clear();
-            }
+            return ldevs;
         }
 
         Task ScanZip(string directory, string zipPath, IList<HPDataset> output, (DateTime, DateTime) range)

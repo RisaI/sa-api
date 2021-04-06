@@ -22,14 +22,14 @@ namespace SAApi.Data
         public Type YType { get; set; }
 
         [JsonConverter(typeof(RangeTupleConverter))]
-        public (object, object) AvailableXRange { get; set; }
+        public IEnumerable<DataRange> DataRange { get; set; }
 
         [JsonIgnore]
         public string[] Variants { get; set; }
 
         public int VariantCount => Variants?.Length ?? 1;
 
-        public Dataset(string id, string name, string description, IIdentified source, Type xType, Type yType, (object, object) xRange, params string[] variants)
+        public Dataset(string id, string name, string description, IIdentified source, Type xType, Type yType, IEnumerable<DataRange> xRange, params string[] variants)
         {
             Id = id;
             Name = name;
@@ -38,37 +38,43 @@ namespace SAApi.Data
             XType = xType;
             YType = yType;
 
-            AvailableXRange = xRange;
+            DataRange = xRange;
 
             Variants = variants;
 
-            if (xRange.Item1?.GetType() != XType || xRange.Item2?.GetType() != XType)
-                throw new Exception("Invalid data type in range specification");
-
             // TODO: custom exception
+            if (xRange.Any(r => r.Type != XType))
+                throw new Exception("Invalid data type in range specification");
         }
     }
 
-    public class RangeTupleConverter : JsonConverter<(object, object)>
+    public class RangeTupleConverter : JsonConverter<IEnumerable<DataRange>>
     {
-        public override (object, object) Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override IEnumerable<DataRange> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            return (null, null);
+            return Enumerable.Empty<DataRange>();
         }
 
-        public override void Write(Utf8JsonWriter writer, (object, object) value, JsonSerializerOptions options)
+        public override void Write(Utf8JsonWriter writer, IEnumerable<DataRange> value, JsonSerializerOptions options)
         {
             writer.WriteStartArray();
             
-            if (value.Item1 == null)
-                writer.WriteNullValue();
-            else
-                WriteValue(writer, value.Item1, options);
+            foreach (var val in value)
+            {
+                writer.WriteStartArray();
 
-            if (value.Item2 == null)
-                writer.WriteNullValue();
-            else
-                WriteValue(writer, value.Item2, options);
+                if (val.From == null)
+                    writer.WriteNullValue();
+                else
+                    WriteValue(writer, val.From, options);
+
+                if (val.To == null)
+                    writer.WriteNullValue();
+                else
+                    WriteValue(writer, val.To, options);
+
+                writer.WriteEndArray();
+            }
 
             writer.WriteEndArray();
         }

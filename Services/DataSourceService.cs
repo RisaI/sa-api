@@ -38,7 +38,7 @@ namespace SAApi.Services
                         _Sources.Add(new Data.Sources.DummyDataSource(source.Key, source));
                         break;
                     case "hp":
-                        _Sources.Add(new Data.Sources.HPDataSource(source.Key, source));
+                        _Sources.Add(new Data.Sources.HP.HPDataSource(source.Key, source));
                         break;
                     default:
                         throw new ArgumentException($"Source of type '{source["type"]}' does not exist.");

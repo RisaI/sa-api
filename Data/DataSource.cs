@@ -25,6 +25,7 @@ namespace SAApi.Data
         }
 
         public abstract Task<Node> GetNode(string id, string variant, Services.ResourceCache resCache);
+        public abstract Task GetBulkData(string id, IEnumerable<string> variant, DataRange range, System.IO.Stream stream);
         public abstract Task OnTick(IServiceScope scope);
 
         public abstract Task<object> ActivateFeatureAsync(string feature, System.IO.Stream body);

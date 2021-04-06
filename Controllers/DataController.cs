@@ -73,6 +73,32 @@ namespace SAApi.Controllers
             return Ok(set.Variants);
         }
 
+        [HttpPost("{sourceId}/{setId}")]
+        public async Task BulkVariants([FromRoute] string sourceId, [FromRoute] string setId, [FromBody] BulkDataRequest request)
+        {
+            var source = _DataSources.GetSource(sourceId);
+            var set = source?.Datasets?.FirstOrDefault(s => s.Id == setId);
+
+            if (source == null || set == null)
+            {
+                Response.StatusCode = 404;
+                await Response.CompleteAsync();
+                return;
+            }
+            
+            var range = Helper.ParseRange(
+                set.XType,
+                request.From,
+                request.To
+            );
+
+            Response.ContentType = "application/octet-stream";
+
+            // Response.Body.
+
+            await Response.CompleteAsync();
+        }
+
         [HttpPost]
         public async Task GetPipelineData([FromBody] FetchDataRequest body)
         {

@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace SAApi.Data.Sources
+namespace SAApi.Data.Sources.HP
 {
     public class HPDataSource : DataSource
     {
@@ -123,20 +125,20 @@ namespace SAApi.Data.Sources
 
                     await reader.ReadLineAsync();
                     await reader.ReadLineAsync();
-                    
+
                     while (!reader.EndOfStream)
                     {
                         var cols = (await reader.ReadLineAsync()).Split(',');
                         if (string.IsNullOrWhiteSpace(cols[5]) || !ldevHostsMap.ContainsKey(cols[5]))
                             continue;
-                        
+
                         var ldev = ldevHostsMap[cols[5]];
                         var host = new HostPort(cols[1], cols[0]);
                         var hostAlias = $"{host.Hostgroup}:{host.Port}";
 
                         if (!hostWWNs.ContainsKey(hostAlias))
                             hostWWNs.Add(hostAlias, new List<WWNInfo>());
-                        
+
                         ldev.Add(host);
                     }
 
@@ -188,10 +190,11 @@ namespace SAApi.Data.Sources
                         typeof(int),
                         range,
                         null
-                        ) {
-                        ZipPath = zipPath,
-                        FileEntry = entry.FullName,
-                    });
+                        )
+                        {
+                            ZipPath = zipPath,
+                            FileEntry = entry.FullName,
+                        });
                 }
             }
 
@@ -230,165 +233,49 @@ namespace SAApi.Data.Sources
         {
             if (feature == "ldev_map")
             {
-                var @params = await System.Text.Json.JsonSerializer.DeserializeAsync<LDEVMapRequest>(body);
+                var @params = await JsonSerializer.DeserializeAsync<LDEVMapRequest>(body);
                 var ldev = LDEVs.Find(ldev => ldev.Id.Equals(@params.Id.Substring(0, 8), StringComparison.InvariantCultureIgnoreCase));
                 return ldev;
             }
             else
                 throw new NotImplementedException();
         }
+
+        public override async Task GetBulkData(string id, IEnumerable<string> variant, DataRange range, Stream stream)
+        {
+            var dataset = this.Datasets.First(d => d.Id == id);
+            var bound = DataRange.BoundingBox(dataset.DataRange);
+
+            if (!bound.Contains(range)) return;
+
+
+        }
     }
 
-    class LDEVMapRequest
+    record LDEVMapRequest
     {
-        [System.Text.Json.Serialization.JsonPropertyName("id")] public string Id { get; set; }
+        [JsonPropertyName("id")] public string Id { get; init; }
     }
 
     public class HPDataset : Dataset
     {
-        public string ZipPath;
-        public string FileEntry;
+        public string ZipPath { get; init; }
+        public string FileEntry { get; init; }
+        public bool IsLdevData { get; init; }
 
-        public HPDataset(string id, string name, string description, IIdentified source, Type xType, Type yType, (object, object) xRange, params string[] variants) : base(id, name, description, source, xType, yType, xRange, variants)
+        public HPDataset(
+            
+            string id,
+            string name,
+            string description,
+            IIdentified source,
+            Type xType,
+            Type yType,
+            (DateTime From, DateTime To) xRange,
+            params string[] variants
+            
+            ) : base(id, name, description, source, xType, yType, new [] { new DataRange(typeof(DateTime), xRange.From, xRange.To) }, variants)
         {
-        }
-    }
-
-    public sealed class HPDataNode : Node
-    {
-        public HPDataSource Source { get; private set; }
-        public HPDataset Dataset { get; private set; }
-        public string Variant { get; private set; }
-
-        private (DateTime, DateTime) SelectedRange;
-        private Services.ResourceCache resourceCache;
-
-        public HPDataNode(HPDataSource source, HPDataset set, string variant, Services.ResourceCache resCache)
-            : base(set.XType, set.YType)
-        {
-            Source = source;
-            Dataset = set;
-            Variant = variant;
-            resourceCache = resCache;
-        }
-
-        private List<DateTime> AvailableDates;
-        public override void ApplyXRange((object, object) xRange)
-        {
-            SelectedRange = Helper.IntersectDateTimes(Dataset.AvailableXRange, xRange);
-            AvailableDates = Source.GetAvailableDates.Where(
-                    d =>
-                        d >= SelectedRange.Item1.Date.AddDays(-1) &&
-                        d <= SelectedRange.Item2.Date.AddDays(1)
-                )
-                .Where(d => File.Exists(Path.Combine(Source.GetPathFromDate(d), Dataset.ZipPath)))
-                .OrderBy(d => d.Ticks).ToList();
-        }
-
-        const int MinCached = 100;
-        List<(DateTime, int)> _Cached = new List<(DateTime, int)>(10_000);
-        public override async Task<bool> HasNextAsync()
-        {
-            while (_Cached.Count < MinCached && AvailableDates.Count > 0)
-                await PullToCache();
-
-            return _Cached.Count > 0;
-        }
-
-        public override Task<(object, object)> NextAsync()
-        {
-            var val = PeekAsync();
-
-            _Cached.RemoveAt(0);
-
-            return val;
-        }
-
-        public override Task<(object, object)> PeekAsync()
-        {
-            return Task.FromResult<(object, object)>(_Cached[0]);
-        }
-
-        private Task PullToCache()
-        {
-            var csv = resourceCache.GetCSVFileFromZipAsync(Path.Combine(Source.GetPathFromDate(AvailableDates[0]), Dataset.ZipPath), Dataset.FileEntry, ',', 6);
-
-            var colIdx = Array.IndexOf(csv.First(), $"\"{Variant}\"");
-
-            foreach (var line in csv.Skip(1))
-            {
-                var date = DateTime.ParseExact(line[1].Trim('"'), HPDataSource.DateFormat, null);
-
-                if (date < SelectedRange.Item1)
-                    continue;
-                if (date > SelectedRange.Item2)
-                    break;
-
-                _Cached.Add((date, int.Parse(line[colIdx].Trim('"'))));
-            }
-
-            AvailableDates.RemoveAt(0);
-
-            return Task.CompletedTask;
-        }
-    }
-
-    public class LDEVInfo
-    {
-        public string ECCGroup { get; set; }
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public float Size { get; set; }
-        public string MPU { get; set; }
-        public string PoolName { get; set; }
-
-        // public IEnumerable<string> Hostnames { get { return HostPorts.Select(h => h.Hostname).Distinct(); } }
-        // public IEnumerable<string> Ports { get { return HostPorts.Select(w => w.Port); } }
-        // public IEnumerable<string> WwnNames { get { return Wwns.Select(w => w.WWN); } }
-        // public IEnumerable<string> WwnNicknames { get { return Wwns.Select(w => w.Nickname); } }
-
-        public HostPort[] HostPorts { get; set; }
-        public WWNInfo[] Wwns { get; set; }
-
-        public LDEVInfo(string[] csvColumns)
-        {
-            ECCGroup = csvColumns[0];
-            Id = csvColumns[1];
-            Name = csvColumns[2];
-            Size = float.Parse(csvColumns[7]);
-            MPU = csvColumns[15];
-            PoolName = csvColumns[18];
-        }
-    }
-
-    public class HostPort
-    {
-        public string Hostgroup { get; set; }
-        public string Port { get; set; }
-
-        public HostPort() { }
-        public HostPort(string hostgroup, string port)
-        {
-            Hostgroup = hostgroup;
-            Port = port;
-        }
-    }
-
-    public class WWNInfo
-    {
-        public string Port { get; set; }
-        public string Hostgroup { get; set; }
-        public string Wwn { get; set; }
-        public string Nickname { get; set; }
-        public string Location { get; set; }
-
-        public WWNInfo(string[] csvColumns)
-        {
-            Port = csvColumns[0];
-            Hostgroup = csvColumns[1];
-            Wwn = csvColumns[4];
-            Nickname = csvColumns[5];
-            Location = csvColumns[7];
         }
     }
 }

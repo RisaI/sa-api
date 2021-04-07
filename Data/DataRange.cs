@@ -34,5 +34,15 @@ namespace SAApi.Data
 
             return new (ranges.First().Type, min, max);
         }
+
+        public static DataRange Create<T>(T from, T to) where T : IComparable
+        {
+            return new DataRange(typeof(T), from, to);
+        }
+
+        public static DataRange Create<T>((T, T) range) where T : IComparable
+        {
+            return new DataRange(typeof(T), range.Item1, range.Item2);
+        }
     }
 }

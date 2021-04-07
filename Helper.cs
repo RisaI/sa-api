@@ -1,5 +1,7 @@
 
 using System;
+using System.Collections.Generic;
+using SAApi.Data;
 
 namespace SAApi
 {
@@ -57,5 +59,7 @@ namespace SAApi
                 await writer.Write(x, y);
             }
         }
+
+        public static DataRange BoundingBox(this IEnumerable<DataRange> ranges) => DataRange.BoundingBox(ranges);
     }
 }

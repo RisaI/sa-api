@@ -30,7 +30,10 @@ namespace SAApi.Data.Sources.HP
         private List<DateTime> AvailableDates;
         public override void ApplyXRange((object, object) xRange)
         {
-            SelectedRange = Helper.IntersectDateTimes(Dataset.AvailableXRange, xRange);
+            var boundingRange = DataRange.BoundingBox(Dataset.DataRange);
+            var dataRange = (boundingRange.From as DateTime?, boundingRange.To as DateTime?);
+
+            SelectedRange = Helper.IntersectDateTimes(dataRange, xRange);
             AvailableDates = Source.GetAvailableDates.Where(
                     d =>
                         d >= SelectedRange.Item1.Date.AddDays(-1) &&

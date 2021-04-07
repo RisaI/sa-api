@@ -55,7 +55,7 @@ namespace SAApi.Data.Sources
         public override Task<Node> GetNode(string id, string variant, Services.ResourceCache _)
         {
             var dataset = Datasets.First(d => d.Id == id) as DummyDataset;
-            return Task.FromResult<Node>(new DummyNode((DateTime)dataset.AvailableXRange.Item1, dataset.Jump, dataset.AvailableXRange, dataset.Func));
+            return Task.FromResult<Node>(new DummyNode((DateTime)dataset.DataRange.First().From, dataset.Jump, dataset.DataRange.BoundingBox(), dataset.Func));
         }
 
         public override Task OnTick(IServiceScope scope)
@@ -68,13 +68,19 @@ namespace SAApi.Data.Sources
             throw new NotImplementedException();
         }
 
+        public override Task GetBulkData(string id, IEnumerable<string> variant, DataRange range, Stream stream)
+        {
+            // TODO:
+            throw new NotImplementedException();
+        }
+
         public class DummyDataset : Dataset
         {
             public TimeSpan Jump;
             public Func<DateTime, int, float> Func;
             
             public DummyDataset(string id, string name, string description, IIdentified source, (DateTime, DateTime) xRange, TimeSpan jump, Func<DateTime, int, float> func) :
-                base(id, name, description, source, typeof(DateTime), typeof(float), xRange, null)
+                base(id, name, description, source, typeof(DateTime), typeof(float), new [] { Data.DataRange.Create(xRange) }, null)
             {
                 Jump = jump;
                 Func = func;
@@ -88,9 +94,9 @@ namespace SAApi.Data.Sources
             private DateTime _Max;
             private TimeSpan _Jump;
             private Func<DateTime, int, float> _Func;
-            private (object, object) AvailableXRange;
+            private DataRange AvailableXRange;
 
-            public DummyNode(DateTime start, TimeSpan jump, (object, object) availableXRange, Func<DateTime, int, float> func)
+            public DummyNode(DateTime start, TimeSpan jump, DataRange availableXRange, Func<DateTime, int, float> func)
                 : base(typeof(DateTime), typeof(float))
             {
                 _Jump = jump;
@@ -102,10 +108,10 @@ namespace SAApi.Data.Sources
 
             public override void ApplyXRange((object, object) xRange)
             {
-                var range = Helper.IntersectDateTimes(AvailableXRange, (xRange.Item1, xRange.Item2));
-                _Max = (DateTime)xRange.Item2;
+                var range = AvailableXRange.Intersection(Data.DataRange.Create<DateTime>(((DateTime, DateTime))xRange));
+                _Max = (DateTime)range.To;
 
-                while (_Cursor < (DateTime)xRange.Item1)
+                while (_Cursor < (DateTime)range.From)
                 {
                     _Cursor += _Jump;
                     ++_Idx;

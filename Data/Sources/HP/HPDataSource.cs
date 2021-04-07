@@ -41,6 +41,7 @@ namespace SAApi.Data.Sources.HP
 
         private List<HPDataset> _temp = new List<HPDataset>();
         private List<LDEVInfo> LDEVs = new List<LDEVInfo>();
+        private List<(DataRange Range, string Path)> Ranges = new List<(DataRange Range, string Path)>();
         public override async Task OnTick(IServiceScope scope)
         {
             var dirs = Directory.GetDirectories(DataPath);
@@ -51,6 +52,11 @@ namespace SAApi.Data.Sources.HP
             // ? config.zip
             // ? capacity.cfg
             // ? LDEVEachOfCU_dat
+
+            Ranges = dirs.Select(d => {
+                var range = DirectoryMap.DetermineTimeRange(d);
+                return (DataRange.Create(range), d);
+            }).ToList();
 
             var latestDir = Path.Combine(DataPath, $"PFM_{nearestDate.ToString(DirectoryDateFormat)}");
 
@@ -248,7 +254,14 @@ namespace SAApi.Data.Sources.HP
 
             if (!bound.Contains(range)) return;
 
+            int i = 0;
+            var dict   = variant.ToDictionary(v => v, v => ++i);
+            var buffer = new byte[variant.Count() * sizeof(int) + sizeof(int)];
+            
+            
 
+            // TODO: Find directories intersecting with data range
+            // TODO: prepare data row byte array
         }
     }
 
@@ -274,7 +287,7 @@ namespace SAApi.Data.Sources.HP
             (DateTime From, DateTime To) xRange,
             params string[] variants
             
-            ) : base(id, name, description, source, xType, yType, new [] { new DataRange(typeof(DateTime), xRange.From, xRange.To) }, variants)
+            ) : base(id, name, description, source, xType, yType, new [] { Data.DataRange.Create(xRange) }, variants)
         {
         }
     }

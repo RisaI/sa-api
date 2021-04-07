@@ -94,21 +94,21 @@ namespace SAApi.Data.Sources
             private DateTime _Max;
             private TimeSpan _Jump;
             private Func<DateTime, int, float> _Func;
-            private DataRange AvailableXRange;
+            private DataRange DataRange;
 
             public DummyNode(DateTime start, TimeSpan jump, DataRange availableXRange, Func<DateTime, int, float> func)
                 : base(typeof(DateTime), typeof(float))
             {
                 _Jump = jump;
                 _Func = func;
-                AvailableXRange = availableXRange;
+                DataRange = availableXRange;
 
                 _Cursor = start;
             }
 
             public override void ApplyXRange((object, object) xRange)
             {
-                var range = AvailableXRange.Intersection(Data.DataRange.Create<DateTime>(((DateTime, DateTime))xRange));
+                var range = DataRange.Intersection(Data.DataRange.Create<DateTime>(((DateTime, DateTime))xRange));
                 _Max = (DateTime)range.To;
 
                 while (_Cursor < (DateTime)range.From)

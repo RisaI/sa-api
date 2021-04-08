@@ -13,6 +13,7 @@ namespace SAApi.Data
 
         public string Id { get; private set; }
         public string Name { get { return _Config["name"] ?? _DefaultName; } }
+        public abstract string Type { get; }
 
         private string _DefaultName;
         protected IConfiguration _Config { get; private set; }

@@ -11,8 +11,10 @@ namespace SAApi.Data
     public class Dataset : IIdentified
     {
         public string Id { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
+        public string[]? Category { get; set; }
+
+        // public string Name { get; set; }
+        // public string Description { get; set; }
 
         public string Source { get; set; }
 
@@ -29,11 +31,12 @@ namespace SAApi.Data
 
         public int VariantCount => Variants?.Length ?? 1;
 
-        public Dataset(string id, string name, string description, IIdentified source, Type xType, Type yType, IEnumerable<DataRange> xRange, params string[] variants)
+        public Dataset(string id, string[]? category, IIdentified source, Type xType, Type yType, IEnumerable<DataRange> xRange, params string[] variants)
         {
             Id = id;
-            Name = name;
-            Description = description;
+            Category = category;
+            // Name = name;
+            // Description = description;
             Source = source.Id;
             XType = xType;
             YType = yType;

@@ -17,6 +17,7 @@ namespace SAApi.Data.Sources.HP
         public static readonly string[] DetectedPatterns = new string[] { "LDEV_*.zip", "Phy*_dat.ZIP", "Port_*.ZIP" };
 
         string DataPath { get { return _Config["path"]; } }
+        public override string Type => "hp";
 
         public HPDataSource(string id, IConfigurationSection config)
             : base(id, "Disková pole HP", config)
@@ -44,56 +45,85 @@ namespace SAApi.Data.Sources.HP
         private List<(DataRange Range, string Path)> Ranges = new List<(DataRange Range, string Path)>();
         public override async Task OnTick(IServiceScope scope)
         {
-            var dirs = Directory.GetDirectories(DataPath);
-            var dates = dirs.Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null));
-            var nearestDate = dates.Max();
-            var availableRange = (dates.Min(), nearestDate.AddDays(1));
+            var dirs = Directory.GetDirectories(DataPath, "PFM_*");
+            // var dates = dirs.Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null));
+            // var nearestDate = dates.Max();
 
-            // ? config.zip
-            // ? capacity.cfg
             // ? LDEVEachOfCU_dat
 
             Ranges = dirs.Select(d => {
                 var range = DirectoryMap.DetermineTimeRange(d);
                 return (DataRange.Create(range), d);
-            }).ToList();
+            }).OrderBy(r => r.Item1.From).ToList();
 
-            var latestDir = Path.Combine(DataPath, $"PFM_{nearestDate.ToString(DirectoryDateFormat)}");
+            var availableRange = Ranges.Select(r => r.Range).BoundingBox()?.ToTuple<DateTime>() ?? throw new Exception("Unexpected range type");
 
-            foreach (var fileName in DetectedPatterns.SelectMany(p => Directory.GetFiles(latestDir, p)))
-                await ScanZip(Path.GetDirectoryName(fileName), Path.GetFileName(fileName), _temp, availableRange);
+            var maps = dirs.Select(d => DirectoryMap.BuildDirectoryMap(d)).ToArray();
 
+            foreach (var map in maps)
             {
-                var dict = new Dictionary<string, List<string>>();
-                foreach (var date in dates)
-                {
-                    var path = GetPathFromDate(date);
+                Ranges.Add((DataRange.Create(map.TimeRange), map.Root));
 
-                    foreach (var fileName in DetectedPatterns.SelectMany(p => Directory.GetFiles(path, p)))
-                        await ScanZipVariants(Path.GetDirectoryName(fileName), Path.GetFileName(fileName), dict);
-                }
-
-                foreach (var set in _temp)
+                foreach (var zip in map.PhysicalFiles)
                 {
-                    set.Variants = dict[set.FileEntry].ToArray();
+                    if (zip.StartsWith("LDEVEachOfCU_dat"))
+                        continue;
+
+                    var category = Path.GetDirectoryName(zip) switch {
+                        string path when !string.IsNullOrWhiteSpace(path) => path.Split(),
+                        _ => new string[] { Path.GetFileNameWithoutExtension(zip) }
+                    };
+
+                    map.OpenLocalZip(zip, archive => {
+                        foreach (var entry in archive.Entries) {
+                            var range = map.TimeRange;
+                            var variants = map.Metas[$"{zip}::{entry.FullName}"].Headers.SelectMany(h => h);
+                            var id = Path.GetFileNameWithoutExtension(entry.FullName);
+
+                            var prev = _temp.FirstOrDefault(ds => ds.Id == id);
+
+                            if (prev == null) {
+                                lock (_temp) {
+                                    _temp.Add(new HPDataset(
+                                        id,
+                                        category,
+                                        this,
+                                        typeof(DateTime),
+                                        typeof(int),
+                                        map.TimeRange,
+                                        variants.ToArray()
+                                    ));
+                                }
+                            } else {
+                                prev.DataRange = prev.DataRange.Append(DataRange.Create(range));
+                                prev.Variants = prev.Variants.Concat(variants).Distinct().ToArray();
+                            }
+                        }
+                    });
                 }
             }
 
+            _temp.ForEach(t => t.DataRange = DataRange.Simplify(t.DataRange));
 
-            var configs = new string[] {
-                Path.Combine(latestDir, "config.zip"),
-                Path.Combine(DataPath, "config.zip"),
-            };
-            var availableConf = configs.FirstOrDefault(p => File.Exists(p));
+            {
+                var recentDate = maps.Max(m => m.TimeRange.To);
+                var latestPath = maps.First(m => m.TimeRange.To == recentDate).Root;
 
-            if (availableConf != null)
-            {
-                this.LDEVs = await LoadConfig(availableConf);
-                _Features = new string[] { LdevMapFeature };
-            }
-            else
-            {
-                _Features = new string[0];
+                var configs = new string[] {
+                    Path.Combine(latestPath, "config.zip"),
+                    Path.Combine(DataPath, "config.zip"),
+                };
+                var availableConf = configs.FirstOrDefault(p => File.Exists(p));
+
+                if (availableConf != null)
+                {
+                    this.LDEVs = await LoadConfig(availableConf);
+                    _Features = new string[] { LdevMapFeature };
+                }
+                else
+                {
+                    _Features = new string[0];
+                }
             }
 
             // Swapnout temp a ostrej
@@ -177,35 +207,35 @@ namespace SAApi.Data.Sources.HP
             return ldevs;
         }
 
-        Task ScanZip(string directory, string zipPath, IList<HPDataset> output, (DateTime, DateTime) range)
-        {
-            using (var stream = new FileStream(Path.Combine(directory, zipPath), FileMode.Open, FileAccess.Read))
-            using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, false))
-            {
-                foreach (var entry in zip.Entries)
-                {
-                    var id = Path.GetFileNameWithoutExtension(entry.FullName);
+        // Task ScanZip(string directory, string zipPath, IList<HPDataset> output, (DateTime, DateTime) range)
+        // {
+        //     using (var stream = new FileStream(Path.Combine(directory, zipPath), FileMode.Open, FileAccess.Read))
+        //     using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, false))
+        //     {
+        //         foreach (var entry in zip.Entries)
+        //         {
+        //             var id = Path.GetFileNameWithoutExtension(entry.FullName);
 
-                    output.Add(
-                        new HPDataset(
-                        id,
-                        id.Replace('_', ' '),
-                        string.Empty,
-                        this,
-                        typeof(DateTime),
-                        typeof(int),
-                        range,
-                        null
-                        )
-                        {
-                            ZipPath = zipPath,
-                            FileEntry = entry.FullName,
-                        });
-                }
-            }
+        //             output.Add(
+        //                 new HPDataset(
+        //                 id,
+        //                 id.Replace('_', ' '),
+        //                 string.Empty,
+        //                 this,
+        //                 typeof(DateTime),
+        //                 typeof(int),
+        //                 range,
+        //                 null
+        //                 )
+        //                 {
+        //                     ZipPath = zipPath,
+        //                     FileEntry = entry.FullName,
+        //                 });
+        //         }
+        //     }
 
-            return Task.CompletedTask;
-        }
+        //     return Task.CompletedTask;
+        // }
 
         async Task ScanZipVariants(string directory, string zipPath, Dictionary<string, List<string>> output)
         {
@@ -249,7 +279,7 @@ namespace SAApi.Data.Sources.HP
 
         public override async Task GetBulkData(string id, IEnumerable<string> variant, DataRange range, Stream stream)
         {
-            var dataset = this.Datasets.First(d => d.Id == id);
+            var dataset = this.Datasets.First(d => d.Id == id) as HPDataset;
             var bound = DataRange.BoundingBox(dataset.DataRange);
 
             if (!bound.Contains(range)) return;
@@ -258,10 +288,18 @@ namespace SAApi.Data.Sources.HP
             var dict   = variant.ToDictionary(v => v, v => ++i);
             var buffer = new byte[variant.Count() * sizeof(int) + sizeof(int)];
             
-            
+            foreach (var dir in Ranges.Where(r => r.Range.Intersection(range) != null))
+            {
+                var zipPath = Path.Combine(dir.Path, dataset.ZipPath);
 
-            // TODO: Find directories intersecting with data range
-            // TODO: prepare data row byte array
+                await using var zipStream = File.Open(zipPath, FileMode.Open, FileAccess.Read);
+                using var zip = new ZipArchive(zipStream, ZipArchiveMode.Read);
+                
+
+                // Locate File
+                // Open read stream
+                // parse data in range, assign to column using 
+            }
         }
     }
 
@@ -279,15 +317,14 @@ namespace SAApi.Data.Sources.HP
         public HPDataset(
             
             string id,
-            string name,
-            string description,
+            string[] category,
             IIdentified source,
             Type xType,
             Type yType,
             (DateTime From, DateTime To) xRange,
             params string[] variants
             
-            ) : base(id, name, description, source, xType, yType, new [] { Data.DataRange.Create(xRange) }, variants)
+            ) : base(id, category, source, xType, yType, new [] { Data.DataRange.Create(xRange) }, variants)
         {
         }
     }

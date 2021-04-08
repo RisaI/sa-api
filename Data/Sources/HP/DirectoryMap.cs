@@ -11,8 +11,8 @@ namespace SAApi.Data.Sources.HP
 {
     public class DirectoryMap
     {
-        public const string MapFileName = ".map.json";
-        public static readonly string[] DetectedFilePatterns = new string[] { "LDEV_*.ZIP", "*_dat.ZIP" };
+        public const string MapFileName = ".client-map.json";
+        public static readonly string[] DetectedFilePatterns = new string[] { "LDEV_*.ZIP", "LDEV_Short.zip", "*_dat.ZIP" };
 
         [JsonIgnore] public string Root { get; set; } = string.Empty;
         public IEnumerable<string> PhysicalFiles { get; set; } = System.Linq.Enumerable.Empty<string>();
@@ -38,7 +38,7 @@ namespace SAApi.Data.Sources.HP
 
         public static DirectoryMap BuildDirectoryMap(string dir)
         {
-            var mapFile = Path.Combine(dir, ".map.json");
+            var mapFile = Path.Combine(dir, MapFileName);
 
             if (File.Exists(mapFile))
             {

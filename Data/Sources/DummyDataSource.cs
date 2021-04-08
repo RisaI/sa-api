@@ -15,6 +15,7 @@ namespace SAApi.Data.Sources
 
         public override IEnumerable<Dataset> Datasets { get; }
         public override IEnumerable<string> Features { get { return Enumerable.Empty<string>(); } }
+        public override string Type => "dummy";
         private float[] SampleData;
 
         public DummyDataSource(string id, IConfigurationSection config) : base(id, "Dummy Data Source", config)
@@ -24,28 +25,28 @@ namespace SAApi.Data.Sources
                 SampleData[i] = (float)_Random.NextDouble();
 
             Datasets = new [] { 
-                new DummyDataset(
-                    "testset", "Testovací set", "Obsahuje náhodně vygenerovaná data na test.", this, 
+                new DummyDataset( // "Testovací set", "Obsahuje náhodně vygenerovaná data na test."
+                    "testset", this, 
                     (DateTime.Today.AddDays(-90), DateTime.Today), TimeSpan.FromDays(1),
                     (date, idx) => SampleData[idx]
                 ),
-                new DummyDataset(
-                    "zeros", "Prázdný set", "Obsahuje nuly.", this,
+                new DummyDataset( // "Prázdný set", "Obsahuje nuly."
+                    "zeros", this,
                     (DateTime.Today.AddDays(-90), DateTime.Today), TimeSpan.FromDays(1),
                     (date, idx) => 0f
                 ),
-                new DummyDataset(
-                    "peak", "Pík", "Obsahuje jeden Gaussovský pík.", this,
+                new DummyDataset( // "Pík", "Obsahuje jeden Gaussovský pík."
+                    "peak", this,
                     (DateTime.Today.AddDays(-90), DateTime.Today), TimeSpan.FromDays(1),
                     (date, idx) => MathF.Exp(-0.7f * MathF.Pow((float)(date - DateTime.Today.AddDays(-45)).TotalDays, 2f))
                 ),
-                new DummyDataset(
-                    "dense", "Hustá data", "Obsahuje 36k bodů.", this,
+                new DummyDataset( // "Hustá data", "Obsahuje 36k bodů."
+                    "dense", this,
                     (DateTime.Today.AddDays(-300), DateTime.Today), TimeSpan.FromMinutes(12),
                     (date, idx) => (float)_Random.NextDouble()
                 ),
-                new DummyDataset(
-                    "extradense", "Extrémně hustá data", "Obsahuje 108k bodů.", this,
+                new DummyDataset( // "Extrémně hustá data", "Obsahuje 108k bodů."
+                    "extradense", this,
                     (DateTime.Today.AddDays(-300), DateTime.Today), TimeSpan.FromMinutes(4),
                     (date, idx) => (float)_Random.NextDouble()
                 ),
@@ -79,8 +80,8 @@ namespace SAApi.Data.Sources
             public TimeSpan Jump;
             public Func<DateTime, int, float> Func;
             
-            public DummyDataset(string id, string name, string description, IIdentified source, (DateTime, DateTime) xRange, TimeSpan jump, Func<DateTime, int, float> func) :
-                base(id, name, description, source, typeof(DateTime), typeof(float), new [] { Data.DataRange.Create(xRange) }, null)
+            public DummyDataset(string id, IIdentified source, (DateTime, DateTime) xRange, TimeSpan jump, Func<DateTime, int, float> func) :
+                base(id, null, source, typeof(DateTime), typeof(float), new [] { Data.DataRange.Create(xRange) }, null)
             {
                 Jump = jump;
                 Func = func;

@@ -25,6 +25,8 @@ namespace SAApi.Data
         public bool Contains(DataRange b) =>
             From.CompareTo(b.From) <= 0 && To.CompareTo(b.To) >= 0;
 
+        public (T, T) ToTuple<T>() where T : IComparable => ((T, T))(From, To);
+
         public static DataRange? BoundingBox(IEnumerable<DataRange> ranges)
         {
             if (ranges.Select(r => r.Type).Distinct().Count() != 1) return null;
@@ -33,6 +35,33 @@ namespace SAApi.Data
             var max = ranges.Max(r => r.To)!;
 
             return new (ranges.First().Type, min, max);
+        }
+
+        public static IEnumerable<DataRange> Simplify(IEnumerable<DataRange> ranges)
+        {
+            if (!ranges.Any()) return Enumerable.Empty<DataRange>();
+
+            var sorted = ranges.OrderBy(r => r.From);
+
+            return Merge(sorted).ToArray();
+
+            IEnumerable<DataRange> Merge(IEnumerable<DataRange> m)
+            {
+                DataRange prev = m.First();
+
+                foreach (var next in m.Skip(1))
+                {
+                    if (prev.Intersection(next) != null)
+                        prev = BoundingBox(new [] { prev, next })!;
+                    else
+                    {
+                        yield return prev;
+                        prev = next;
+                    }
+                }
+
+                yield return prev;
+            }
         }
 
         public static DataRange Create<T>(T from, T to) where T : IComparable

@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using SAApi.Data;
 
+#nullable enable
+
 namespace SAApi
 {
     public static class Helper
@@ -22,7 +24,7 @@ namespace SAApi
             return Intersect(((DateTime)a.Item1, (DateTime)a.Item2), (b.Item1 as DateTime? ?? DateTime.MinValue, b.Item2 as DateTime? ?? DateTime.MaxValue));
         }
 
-        public static (object, object) ParseRange(Type type, string a, string b)
+        public static (object?, object?) ParseRange(Type type, string a, string b)
         {
             if (type == typeof(DateTime))
                 return (a != null ? (DateTime?)DateTimeOffset.FromUnixTimeSeconds(int.Parse(a)).LocalDateTime : null,
@@ -60,6 +62,6 @@ namespace SAApi
             }
         }
 
-        public static DataRange BoundingBox(this IEnumerable<DataRange> ranges) => DataRange.BoundingBox(ranges);
+        public static DataRange? BoundingBox(this IEnumerable<DataRange> ranges) => DataRange.BoundingBox(ranges);
     }
 }

@@ -77,7 +77,7 @@ namespace SAApi.Data.Sources.HP
                     map.OpenLocalZip(zip, archive => {
                         foreach (var entry in archive.Entries) {
                             var range = map.TimeRange;
-                            var variants = map.Metas[$"{zip}::{entry.FullName}"].Headers.SelectMany(h => h);
+                            var variants = map.Metas[$"{zip}::{entry.FullName}"].Headers.SelectMany(h => h.VariantsSpan.ToArray());
                             var id = Path.GetFileNameWithoutExtension(entry.FullName);
 
                             var prev = _temp.FirstOrDefault(ds => ds.Id == id);
@@ -92,7 +92,7 @@ namespace SAApi.Data.Sources.HP
                                         typeof(int),
                                         map.TimeRange,
                                         variants.ToArray()
-                                    ));
+                                    ) { ZipPath = zip, FileEntry = entry.FullName });
                                 }
                             } else {
                                 prev.DataRange = prev.DataRange.Append(DataRange.Create(range));
@@ -277,29 +277,61 @@ namespace SAApi.Data.Sources.HP
                 throw new NotImplementedException();
         }
 
-        public override async Task GetBulkData(string id, IEnumerable<string> variant, DataRange range, Stream stream)
+        public override Task GetBulkData(string id, IEnumerable<string> variant, DataRange range, Stream stream)
         {
             var dataset = this.Datasets.First(d => d.Id == id) as HPDataset;
             var bound = DataRange.BoundingBox(dataset.DataRange);
 
-            if (!bound.Contains(range)) return;
+            if (!bound.Contains(range)) return Task.CompletedTask;
 
             int i = 0;
-            var dict   = variant.ToDictionary(v => v, v => ++i);
-            var buffer = new byte[variant.Count() * sizeof(int) + sizeof(int)];
+            var variantMap = variant.ToDictionary(v => v, v => ++i);
+
+            var cursor = (DateTime)range.From;
+            var end    = (DateTime)range.To;
+
+            var buffer = new byte[variant.Count() * (sizeof(int) + 1)];
+
+            void SerializeInt (int data,      int idx) => BitConverter.TryWriteBytes(buffer.AsSpan(idx, sizeof(int)), data);
+            void SerializeDate(DateTime date, int idx) => SerializeInt((int)((DateTimeOffset)date).ToUnixTimeSeconds(), idx);
             
             foreach (var dir in Ranges.Where(r => r.Range.Intersection(range) != null))
             {
                 var zipPath = Path.Combine(dir.Path, dataset.ZipPath);
 
-                await using var zipStream = File.Open(zipPath, FileMode.Open, FileAccess.Read);
+                using var zipStream = File.Open(zipPath, FileMode.Open, FileAccess.Read);
                 using var zip = new ZipArchive(zipStream, ZipArchiveMode.Read);
-                
+                using var csvReader = new CsvReader(zip.GetEntry(dataset.FileEntry).Open(), false);
 
-                // Locate File
-                // Open read stream
-                // parse data in range, assign to column using 
+                while (cursor < csvReader.From)
+                {
+                    SerializeDate(cursor, 0);
+
+                    for (i = 1; i <= variant.Count(); ++i)
+                        SerializeInt(-4, i * sizeof(int));
+
+                    cursor = cursor.AddMinutes(1);
+                }
+
+                var query = csvReader.ReadNextBlock()
+                    .SkipWhile(a => a.Time < cursor)
+                    .TakeWhile(a => a.Time <= end);
+
+                foreach (var row in query)
+                {
+                    cursor = row.Time;
+                    SerializeDate(cursor, 0);
+                    
+                    var cols = row.Values.Span;
+                    for (i = 0; i < cols.Length; ++i)
+                    {
+                        var col = cols[i];
+                        SerializeInt(col.Data, (1 + variantMap[col.Variant]) * sizeof(int));
+                    }
+                }
             }
+
+            return Task.CompletedTask;
         }
     }
 

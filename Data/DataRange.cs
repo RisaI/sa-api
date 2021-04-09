@@ -66,12 +66,12 @@ namespace SAApi.Data
 
         public static DataRange Create<T>(T from, T to) where T : IComparable
         {
-            return new DataRange(typeof(T), from, to);
+            return new DataRange(from.GetType(), from, to);
         }
 
         public static DataRange Create<T>((T, T) range) where T : IComparable
         {
-            return new DataRange(typeof(T), range.Item1, range.Item2);
+            return new DataRange(range.Item1.GetType(), range.Item1, range.Item2);
         }
     }
 }

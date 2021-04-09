@@ -1,51 +1,18 @@
 using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SAApi.Data.Sources.HP
 {
-    public record CsvMeta(string Name, string SerialNumber, DateTime From, DateTime To, int SamplingRate, string[][] Headers)
+    public record CsvMeta(string Name, string SerialNumber, DateTime From, DateTime To, int SamplingRate, CsvReader.CsvHeader[] Headers)
     {
-        public const string RangeDateFormat = "yyyy/MM/dd HH:mm";
 
         public static CsvMeta FromStream(Stream csv)
         {
-            string name, serialNumber;
-            DateTime from, to;
-            int samplingRate;
-
-            // csv.Position = 0;
-            using var reader = new StreamReader(csv, null, true, -1, true);
-            T ReadProp<T>(Func<string, string, T> parser)
-            {
-                var prop = ReadProperty(reader.ReadLine() ?? throw new EndOfStreamException("Invalid CSV stream."));
-                return parser.Invoke(prop.prop, prop.val);
-            }
-            DateTime ReadPropDate() => ReadProp((_, v) => DateTime.ParseExact(v, RangeDateFormat, null));
-
-            name = reader.ReadLine() ?? throw new EndOfStreamException("Invalid CSV stream.");
-            serialNumber = ReadProp((k, v) => v);
-            from = ReadPropDate();
-            to = ReadPropDate();
-            samplingRate = ReadProp((_, v) => string.IsNullOrWhiteSpace(v) ? 1 : int.Parse(v));
-
-            reader.ReadLine(); // Skip empty line
-
-            var headerList = new List<string[]>(8);
-
-            int lineIdx = 6;
-            while (!reader.EndOfStream)
-            {
-                var line = reader.ReadLine();
-                if (line == null) break;
-
-                ++lineIdx;
-
-                if (line.StartsWith("\"No.\""))
-                    headerList.Add(line.Split(','));
-            }
-
-            return new CsvMeta(name, serialNumber, from, to, samplingRate, headerList.ToArray());
+            using var reader = new CsvReader(csv, true);
+            var result = new CsvMeta(reader.Name, reader.SerialNumber, reader.From, reader.To, reader.SamplingRate, reader.ReadAllHeaders().ToArray());
+            return result;
         }
 
         static (string prop, string val) ReadProperty(string line)
@@ -61,12 +28,12 @@ namespace SAApi.Data.Sources.HP
 
             for (int j = 0; j < Headers.Length; ++j)
             {
-                if (Headers[j].Length != meta.Headers[j].Length)
+                if (Headers[j].Columns.Length != meta.Headers[j].Columns.Length)
                     return false;
 
-                for (int i = 0; i < Headers[j].Length; ++i)
+                for (int i = 0; i < Headers[j].Columns.Length; ++i)
                 {
-                    if (Headers[j][i] != meta.Headers[j][i])
+                    if (Headers[j].Columns[i] != meta.Headers[j].Columns[i])
                         return false;
                 }
             }
@@ -78,8 +45,8 @@ namespace SAApi.Data.Sources.HP
         {
             writer.WriteLine(Name);
             writer.WriteLine($"Serial number : {SerialNumber}");
-            writer.WriteLine($"From : {From.ToString(RangeDateFormat)}");
-            writer.WriteLine($"To   : {To.ToString(RangeDateFormat)}");
+            writer.WriteLine($"From : {From.ToString(CsvReader.RangeDateFormat)}");
+            writer.WriteLine($"To   : {To.ToString(CsvReader.RangeDateFormat)}");
             writer.WriteLine($"sampling rate : {SamplingRate}");
             writer.WriteLine();
         }

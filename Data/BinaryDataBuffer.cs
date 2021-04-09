@@ -66,7 +66,7 @@ namespace SAApi.Data
             return default(ValueTask);
         }
 
-        private SpanAction<byte, object> GetSerializer(Type type)
+        public static SpanAction<byte, object> GetSerializer(Type type)
         {
             if (type == typeof(int))
                 return (s, o) => BitConverter.TryWriteBytes(s, (int)o);

@@ -73,7 +73,7 @@ namespace SAApi.Controllers
             return Ok(set.Variants);
         }
 
-        [HttpPost("{sourceId}/{setId}")]
+        [HttpPost("{sourceId}/{setId}/bulk")]
         public async Task BulkVariants([FromRoute] string sourceId, [FromRoute] string setId, [FromBody] BulkDataRequest request)
         {
             var source = _DataSources.GetSource(sourceId);
@@ -85,17 +85,18 @@ namespace SAApi.Controllers
                 await Response.CompleteAsync();
                 return;
             }
+
+            if (request.Variants == null)
+                request = request with { Variants = set.Variants };
             
-            var range = Helper.ParseRange(
+            var range = Data.DataRange.Create(Helper.ParseRange(
                 set.XType,
                 request.From,
                 request.To
-            );
+            ));
 
             Response.ContentType = "application/octet-stream";
-
-            // Response.Body.
-
+            await source.GetBulkData(sourceId, request.Variants, range, Response.Body);
             await Response.CompleteAsync();
         }
 

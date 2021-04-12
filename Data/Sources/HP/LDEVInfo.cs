@@ -23,7 +23,7 @@ namespace SAApi.Data.Sources.HP
             ECCGroup = csvColumns[0];
             Id = csvColumns[1];
             Name = csvColumns[2];
-            Size = float.Parse(csvColumns[7]);
+            Size = float.Parse(csvColumns[7], System.Globalization.CultureInfo.InvariantCulture);
             MPU = csvColumns[15];
             PoolName = csvColumns[18];
         }

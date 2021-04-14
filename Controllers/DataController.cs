@@ -96,7 +96,7 @@ namespace SAApi.Controllers
             ));
 
             Response.ContentType = "application/octet-stream";
-            await source.GetBulkData(sourceId, request.Variants, range, Response.Body);
+            await source.GetBulkData(setId, request.Variants, range, Response.Body);
             await Response.CompleteAsync();
         }
 

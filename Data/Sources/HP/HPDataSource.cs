@@ -277,12 +277,12 @@ namespace SAApi.Data.Sources.HP
                 throw new NotImplementedException();
         }
 
-        public override Task GetBulkData(string id, IEnumerable<string> variant, DataRange range, Stream stream)
+        public override async Task GetBulkData(string id, IEnumerable<string> variant, DataRange range, Stream stream)
         {
             var dataset = this.Datasets.First(d => d.Id == id) as HPDataset;
             var bound = DataRange.BoundingBox(dataset.DataRange);
 
-            if (!bound.Contains(range)) return Task.CompletedTask;
+            if (!bound.Contains(range)) return;
 
             int i = 0;
             var variantMap = variant.ToDictionary(v => v, v => ++i);
@@ -290,7 +290,7 @@ namespace SAApi.Data.Sources.HP
             var cursor = (DateTime)range.From;
             var end    = (DateTime)range.To;
 
-            var buffer = new byte[variant.Count() * (sizeof(int) + 1)];
+            var buffer = new byte[(variant.Count() + 1) * sizeof(int)];
 
             void SerializeInt (int data,      int idx) => BitConverter.TryWriteBytes(buffer.AsSpan(idx, sizeof(int)), data);
             void SerializeDate(DateTime date, int idx) => SerializeInt((int)((DateTimeOffset)date).ToUnixTimeSeconds(), idx);
@@ -299,7 +299,7 @@ namespace SAApi.Data.Sources.HP
             {
                 var zipPath = Path.Combine(dir.Path, dataset.ZipPath);
 
-                using var zipStream = File.Open(zipPath, FileMode.Open, FileAccess.Read);
+                using var zipStream = File.Open(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                 using var zip = new ZipArchive(zipStream, ZipArchiveMode.Read);
                 using var csvReader = new CsvReader(zip.GetEntry(dataset.FileEntry).Open(), false);
 
@@ -314,24 +314,24 @@ namespace SAApi.Data.Sources.HP
                 }
 
                 var query = csvReader.ReadNextBlock()
-                    .SkipWhile(a => a.Time < cursor)
-                    .TakeWhile(a => a.Time <= end);
+                    .SkipWhile(row => row.Time < cursor)
+                    .TakeWhile(row => row.Time <= end);
 
                 foreach (var row in query)
                 {
                     cursor = row.Time;
                     SerializeDate(cursor, 0);
                     
-                    var cols = row.Values.Span;
+                    var cols = row.Values;
                     for (i = 0; i < cols.Length; ++i)
                     {
-                        var col = cols[i];
-                        SerializeInt(col.Data, (1 + variantMap[col.Variant]) * sizeof(int));
+                        var col = cols.Span[i];
+                        SerializeInt(col.Data, variantMap[col.Variant] * sizeof(int));
                     }
+
+                    await stream.WriteAsync(buffer);
                 }
             }
-
-            return Task.CompletedTask;
         }
     }
 

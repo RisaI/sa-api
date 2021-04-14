@@ -6,6 +6,8 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
+#nullable enable
+
 namespace SAApi.Data
 {
     public class Dataset : IIdentified

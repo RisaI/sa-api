@@ -113,6 +113,7 @@ namespace SAApi.Data.Sources.HP
                     );
 
                     span = span.Slice(Math.Min(span.Length, cursor + 1));
+                    idx += 1;
                 }
 
                 yield return (time, row);

@@ -147,7 +147,9 @@ namespace SAApi.Data.Sources.HP
         
         public static IEnumerable<string> ScanKnownFiles(string directory, bool relativePaths = false)
         {
-            var result = DetectedFilePatterns.SelectMany(pat => Directory.GetFiles(directory, pat, SearchOption.AllDirectories));
+            var result = DetectedFilePatterns
+                .SelectMany(pat => Directory.GetFiles(directory, pat, SearchOption.AllDirectories))
+                .Distinct();
 
             if (relativePaths)
                 return result.Select(p => Path.GetRelativePath(directory, p));

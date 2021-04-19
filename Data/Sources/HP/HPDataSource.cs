@@ -53,7 +53,6 @@ namespace SAApi.Data.Sources.HP
                         var range = DirectoryMap.DetermineTimeRange(d);
                         return (DataRange.Create(range), d) as (DataRange, string)?;
                     } catch {
-                        Console.WriteLine($"{d} is rigged");
                         return null;
                     }
                 })

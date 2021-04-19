@@ -82,9 +82,11 @@ namespace SAApi.Data.Sources.HP
                 });
             }
 
-            using (var stream = new FileStream(mapFile, FileMode.Create, FileAccess.Write))
-            using (var writer = new Utf8JsonWriter(stream))
-                JsonSerializer.Serialize<DirectoryMap>(writer, map);
+            try {
+                using (var stream = new FileStream(mapFile, FileMode.Create, FileAccess.Write))
+                using (var writer = new Utf8JsonWriter(stream))
+                    JsonSerializer.Serialize<DirectoryMap>(writer, map);
+            } finally { }
 
             return map;
         }

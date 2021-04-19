@@ -54,8 +54,8 @@ namespace SAApi.Services
         {
             using (var scope = _ScopeFactory.CreateScope())
             {
-                foreach (var s in _Sources) s.OnTick(scope).GetAwaiter().GetResult(); 
-                // Task.WaitAll(_Sources.Select(s => s.OnTick(scope)).ToArray());
+                // foreach (var s in _Sources) s.OnTick(scope).GetAwaiter().GetResult(); 
+                Task.WaitAll(_Sources.Select(s => s.OnTick(scope)).ToArray());
             }
         }
     

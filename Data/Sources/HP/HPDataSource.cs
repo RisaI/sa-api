@@ -45,20 +45,26 @@ namespace SAApi.Data.Sources.HP
         private List<(DataRange Range, string Path)> Ranges = new List<(DataRange Range, string Path)>();
         public override async Task OnTick(IServiceScope scope)
         {
-            var dirs = Directory.GetDirectories(DataPath, "PFM_*");
-            // var dates = dirs.Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null));
-            // var nearestDate = dates.Max();
-
             // ? LDEVEachOfCU_dat
 
-            Ranges = dirs.Select(d => {
-                var range = DirectoryMap.DetermineTimeRange(d);
-                return (DataRange.Create(range), d);
-            }).OrderBy(r => r.Item1.From).ToList();
+            Ranges = Directory.GetDirectories(DataPath, "PFM_*")
+                .Select(d => {
+                    try {
+                        var range = DirectoryMap.DetermineTimeRange(d);
+                        return (DataRange.Create(range), d) as (DataRange, string)?;
+                    } catch {
+                        Console.WriteLine($"{d} is rigged");
+                        return null;
+                    }
+                })
+                .Where(d => d != null)
+                .Select(d => ((DataRange, string))d)
+                .OrderBy(r => r.Item1.From)
+                .ToList();
 
             var availableRange = Ranges.Select(r => r.Range).BoundingBox()?.ToTuple<DateTime>() ?? throw new Exception("Unexpected range type");
 
-            var maps = dirs.Select(d => DirectoryMap.BuildDirectoryMap(d)).ToArray();
+            var maps = Ranges.Select(r => r.Path).Select(d => DirectoryMap.BuildDirectoryMap(d)).ToArray();
 
             foreach (var map in maps)
             {

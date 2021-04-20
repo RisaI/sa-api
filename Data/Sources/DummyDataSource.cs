@@ -81,7 +81,7 @@ namespace SAApi.Data.Sources
             public Func<DateTime, int, float> Func;
             
             public DummyDataset(string id, IIdentified source, (DateTime, DateTime) xRange, TimeSpan jump, Func<DateTime, int, float> func) :
-                base(id, null, source, typeof(DateTime), typeof(float), new [] { Data.DataRange.Create(xRange) }, null)
+                base(id, new string[0], source, typeof(DateTime), typeof(float), new [] { Data.DataRange.Create(xRange) }, null)
             {
                 Jump = jump;
                 Func = func;

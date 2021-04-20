@@ -15,7 +15,8 @@ namespace SAApi.Data
         public string Id { get; set; }
         public string[] Category { get; set; }
 
-        public string Units { get => "s^-1"; }
+        [JsonPropertyName("units")]
+        public string Units{ get; init; }
 
         // public string Name { get; set; }
         // public string Description { get; set; }
@@ -35,12 +36,11 @@ namespace SAApi.Data
 
         public int VariantCount => Variants?.Length ?? 1;
 
-        public Dataset(string id, string[] category, IIdentified source, Type xType, Type yType, IEnumerable<DataRange> xRange, params string[] variants)
+        public Dataset(string id, string[] category, string? units, IIdentified source, Type xType, Type yType, IEnumerable<DataRange> xRange, params string[] variants)
         {
             Id = id;
             Category = category;
-            // Name = name;
-            // Description = description;
+            Units = units ?? "s^-1";
             Source = source.Id;
             XType = xType;
             YType = yType;

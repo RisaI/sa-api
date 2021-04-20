@@ -87,11 +87,14 @@ namespace SAApi.Data.Sources.HP
 
                             var prev = _temp.FirstOrDefault(ds => ds.Id == id);
 
+                            var units = HPDataset.UnitTable.FirstOrDefault(u => id.Contains(u.Item1, StringComparison.InvariantCultureIgnoreCase));
+
                             if (prev == null) {
                                 lock (_temp) {
                                     _temp.Add(new HPDataset(
                                         id,
                                         category,
+                                        units.Item2 ?? "s^-1",
                                         this,
                                         typeof(DateTime),
                                         typeof(int),
@@ -355,14 +358,59 @@ namespace SAApi.Data.Sources.HP
             
             string id,
             string[] category,
+            string units,
             IIdentified source,
             Type xType,
             Type yType,
             (DateTime From, DateTime To) xRange,
             params string[] variants
             
-            ) : base(id, category, source, xType, yType, new [] { Data.DataRange.Create(xRange) }, variants)
+            ) : base(id, category, units, source, xType, yType, new [] { Data.DataRange.Create(xRange) }, variants)
         {
         }
+
+        public static readonly (string, string)[] UnitTable = new [] {
+            ("PG_C2D_Trans", "DTO"),
+            ("PG_D2CS_Trans", "DTO"),
+            ("PG_D2CR_Trans", "DTO"),
+            ("LDEV_BackTrans", "DTO"),
+            ("LDEV_C2D_Trans", "DTO"),
+            ("LDEV_D2CS_Trans", "DTO"),
+            ("LDEV_D2CR_Trans", "DTO"),
+            ("PHY_ExG_Read_Response", "ms"),
+            ("PHY_ExG_Read_Response", "ms"),
+            ("PHY_ExG_Response", "ms"),
+            ("PHY_ExLDEV_Read_Response", "ms"),
+            ("PHY_ExLDEV_Response", "ms"),
+            ("PHY_ExLDEV_Write_Response", "ms"),
+            ("_Update_Copy_Response", "ms"),
+            ("_Initial_Copy_Response", "ms"),
+            ("_Pair_Synchronized", "percent"),
+            ("_Update_Copy_RIO", "IOP/s"),
+            ("PhyMPPK", "percent"),
+            ("iops", "IOP/s"),
+            ("mb/s", "MB/s"),
+            ("mb", "MB"),
+            ("kbps", "kB/s"),
+            ("kb", "kB"),
+            ("TRANS", "kB/s"),
+            ("MICROSEC.", "us"),
+            ("COUNT", "1"),
+            ("(percent)", "percent"),
+            ("EXG_RESPONSE", "ms"),
+            ("RESPONSE", "us"),
+            ("HIT", "percent"),
+            ("_RATE", "percent"),
+            ("PHY_SHORT_", "percent"),
+            ("PHY_LONG_", "percent"),
+            ("PHY_Cache_Allocate", "MB"),
+            ("PHY_MP", "percent"),
+            ("PHY_PG", "percent"),
+            ("_BlockSize", "kB"),
+            ("timeseriesutilpercentagerx", "percent"),
+            ("timeseriesutilpercentagetx", "percent"),
+            ("timeseriestrafficrx", "MB/s"),
+            ("timeseriestraffictx", "MB/s"),
+        };
     }
 }

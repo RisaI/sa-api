@@ -278,8 +278,16 @@ namespace SAApi.Data.Sources.HP
             if (feature == "ldev_map")
             {
                 var @params = await JsonSerializer.DeserializeAsync<LDEVMapRequest>(body);
-                var ldev = LDEVs.Find(ldev => ldev.Id.Equals(@params.Id.Substring(0, 8), StringComparison.InvariantCultureIgnoreCase));
-                return ldev;
+
+                if (!string.IsNullOrWhiteSpace(@params.Id))
+                {
+                    var ldev = LDEVs.Find(ldev => ldev.Id.Equals(@params.Id.Substring(0, 8), StringComparison.InvariantCultureIgnoreCase));
+                    return ldev;
+                }
+                else
+                {
+                    return @params.Ids.Select(i => LDEVs.FirstOrDefault(l => l.Id.Equals(i.Substring(0, 8), StringComparison.InvariantCultureIgnoreCase))).Where(l => l != null);
+                }
             }
             else
                 throw new NotImplementedException();
@@ -346,6 +354,7 @@ namespace SAApi.Data.Sources.HP
     record LDEVMapRequest
     {
         [JsonPropertyName("id")] public string Id { get; init; }
+        [JsonPropertyName("ids")] public string[] Ids { get; init; }
     }
 
     public class HPDataset : Dataset

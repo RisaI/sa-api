@@ -335,6 +335,10 @@ namespace SAApi.Data.Sources.HP
 
                 foreach (var row in query)
                 {
+                    // Clear da buffa!
+                    for (int j = 0; j < buffer.Length / sizeof(int); ++j)
+                        SerializeInt(-1, j * sizeof(int));
+
                     cursor = row.Time;
                     SerializeDate(cursor, 0);
                     

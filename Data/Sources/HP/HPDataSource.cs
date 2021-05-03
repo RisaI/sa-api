@@ -250,24 +250,14 @@ namespace SAApi.Data.Sources.HP
                 var @params = await JsonSerializer.DeserializeAsync<LDEVMapRequest>(body);
                 var ids = string.IsNullOrWhiteSpace(@params.Id) ? @params.Ids.ToHashSet() : new HashSet<string> { @params.Id };
 
-                switch (@params.Mode)
-                {
-                    case "port":
-                        return LDEVs.Select(l => l.HostPorts.Any(h => ids.Contains(h.Port)));
-                    case "mpu":
-                        return LDEVs.Select(l => ids.Contains(l.MPU));
-                    case "pool":
-                        return LDEVs.Select(l => ids.Contains(l.PoolName));
-                    case "wwn":
-                        return LDEVs.Select(l => l.Wwns.Any(w => ids.Contains(w.Wwn)));
-                    case "hostgroup":
-                        return LDEVs.Select(l => l.Wwns.Any(w => ids.Contains(w.Hostgroup)));
-                    case "ldev":
-                    default:
-                        return LDEVs.Select(l => ids.Contains(l.Id));
-                }
-
-                
+                return LDEVs.Where(@params.Mode switch {
+                    "port"      => l => l.HostPorts.Any(h => ids.Contains(h.Port)),
+                    "mpu"       => l => ids.Contains(l.MPU),
+                    "pool"      => l => ids.Contains(l.PoolName),
+                    "wwn"       => l => l.Wwns.Any(w => ids.Contains(w.Wwn)),
+                    "hostgroup" => l => l.Wwns.Any(w => ids.Contains(w.Hostgroup)),
+                    "ldev" or _ => l => ids.Contains(l.Id)
+                });
             }
             else
                 throw new NotImplementedException();

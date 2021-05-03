@@ -1,4 +1,6 @@
 
+using System.Linq;
+
 namespace SAApi.Data.Sources.HP
 {
     public class LDEVInfo
@@ -19,7 +21,7 @@ namespace SAApi.Data.Sources.HP
             Id = csvColumns[1];
             Name = csvColumns[2];
             Size = float.Parse(csvColumns[7], System.Globalization.CultureInfo.InvariantCulture);
-            MPU = csvColumns[15];
+            MPU = csvColumns[15].Split(';').Last();
             PoolName = csvColumns[18];
         }
     }

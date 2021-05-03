@@ -24,13 +24,18 @@ namespace SAApi
             return Intersect(((DateTime)a.Item1, (DateTime)a.Item2), (b.Item1 as DateTime? ?? DateTime.MinValue, b.Item2 as DateTime? ?? DateTime.MaxValue));
         }
 
-        public static (IComparable?, IComparable?) ParseRange(Type type, string a, string b)
+        public static (IComparable, IComparable) ParseRange(Type type, string a, string b)
         {
-            if (type == typeof(DateTime))
-                return (a != null ? (DateTime?)DateTimeOffset.FromUnixTimeSeconds(int.Parse(a)).LocalDateTime : null,
-                        b != null ? (DateTime?)DateTimeOffset.FromUnixTimeSeconds(int.Parse(b)).LocalDateTime : null);
+            if (type == typeof(DateTime) || type == typeof(HighPrecTime))
+            {
+                var left  = DateTimeOffset.FromUnixTimeSeconds(int.Parse(a) * 60).LocalDateTime;
+                var right = DateTimeOffset.FromUnixTimeSeconds(int.Parse(b) * 60).LocalDateTime;
 
-            return (null, null);
+                if (type == typeof(DateTime)) return (left, right);
+                if (type == typeof(HighPrecTime)) return (new HighPrecTime(left), new HighPrecTime(right));
+            }
+
+            return (0, 0);
         }
 
         public static int Mod(int a, int b)
@@ -62,6 +67,10 @@ namespace SAApi
             }
         }
 
-        public static DataRange? BoundingBox(this IEnumerable<DataRange> ranges) => DataRange.BoundingBox(ranges);
+        public static DataRange? BoundingBox(this IEnumerable<DataRange> ranges) =>
+            DataRange.BoundingBox(ranges);
+
+        public static int ToMinuteRepre(this DateTime date) =>
+            (int)((DateTimeOffset)date).ToUnixTimeSeconds() / 60;
     }
 }

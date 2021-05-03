@@ -215,36 +215,6 @@ namespace SAApi.Data.Sources.HP
             return ldevs;
         }
 
-        // Task ScanZip(string directory, string zipPath, IList<HPDataset> output, (DateTime, DateTime) range)
-        // {
-        //     using (var stream = new FileStream(Path.Combine(directory, zipPath), FileMode.Open, FileAccess.Read))
-        //     using (var zip = new ZipArchive(stream, ZipArchiveMode.Read, false))
-        //     {
-        //         foreach (var entry in zip.Entries)
-        //         {
-        //             var id = Path.GetFileNameWithoutExtension(entry.FullName);
-
-        //             output.Add(
-        //                 new HPDataset(
-        //                 id,
-        //                 id.Replace('_', ' '),
-        //                 string.Empty,
-        //                 this,
-        //                 typeof(DateTime),
-        //                 typeof(int),
-        //                 range,
-        //                 null
-        //                 )
-        //                 {
-        //                     ZipPath = zipPath,
-        //                     FileEntry = entry.FullName,
-        //                 });
-        //         }
-        //     }
-
-        //     return Task.CompletedTask;
-        // }
-
         async Task ScanZipVariants(string directory, string zipPath, Dictionary<string, List<string>> output)
         {
             using (var stream = new FileStream(Path.Combine(directory, zipPath), FileMode.Open, FileAccess.Read))
@@ -278,16 +248,30 @@ namespace SAApi.Data.Sources.HP
             if (feature == "ldev_map")
             {
                 var @params = await JsonSerializer.DeserializeAsync<LDEVMapRequest>(body);
+                var ids = string.IsNullOrWhiteSpace(@params.Id) ? @params.Ids : new string[] { @params.Id };
 
-                if (!string.IsNullOrWhiteSpace(@params.Id))
+                switch (@params.Mode)
                 {
-                    var ldev = LDEVs.Find(ldev => ldev.Id.Equals(@params.Id.Substring(0, 8), StringComparison.InvariantCultureIgnoreCase));
-                    return ldev;
+                    case "port":
+                        return null;
+                    case "mpu":
+                        return null;
+                    case "pool":
+                        return null;
+                    case "wwn":
+                        return null;
+                    case "ldev":
+                    default:
+                        return @params.Ids
+                            .Select(i =>
+                                LDEVs.FirstOrDefault(l => 
+                                    l.Id.Equals(i.Substring(0, Math.Min(i.Length, 8)), StringComparison.InvariantCultureIgnoreCase)
+                                )
+                            )
+                            .Where(l => l != null);
                 }
-                else
-                {
-                    return @params.Ids.Select(i => LDEVs.FirstOrDefault(l => l.Id.Equals(i.Substring(0, 8), StringComparison.InvariantCultureIgnoreCase))).Where(l => l != null);
-                }
+
+                
             }
             else
                 throw new NotImplementedException();
@@ -309,7 +293,7 @@ namespace SAApi.Data.Sources.HP
             var buffer = new byte[(variant.Count() + 1) * sizeof(int)];
 
             void SerializeInt (int data,      int idx) => BitConverter.TryWriteBytes(buffer.AsSpan(idx, sizeof(int)), data);
-            void SerializeDate(DateTime date, int idx) => SerializeInt((int)((DateTimeOffset)date).ToUnixTimeSeconds(), idx);
+            void SerializeDate(DateTime date, int idx) => SerializeInt(date.ToMinuteRepre(), idx);
             
             foreach (var dir in Ranges.Where(r => r.Range.Intersection(range) != null))
             {
@@ -359,6 +343,8 @@ namespace SAApi.Data.Sources.HP
     {
         [JsonPropertyName("id")] public string Id { get; init; }
         [JsonPropertyName("ids")] public string[] Ids { get; init; }
+
+        [JsonPropertyName("mode")] public string Mode { get; init; }
     }
 
     public class HPDataset : Dataset

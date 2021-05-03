@@ -9,7 +9,7 @@ namespace SAApi.Data
 {
     public class BinaryDataBuffer : IDataWriter, IAsyncDisposable, IDisposable
     {
-        static readonly Type[] XTypes = new Type[] { typeof(DateTime) };
+        static readonly Type[] XTypes = new Type[] { typeof(DateTime), typeof(HighPrecTime) };
         static readonly Type[] YTypes = new Type[] { typeof(float), typeof(int) };
 
         private byte[] _BufferRaw = new byte[1024 * 1024 * 16]; // 16 MB buffer
@@ -57,7 +57,11 @@ namespace SAApi.Data
 
             Cursor = 0;
 
-            xSize = xType == typeof(DateTime) ? sizeof(int) : System.Runtime.InteropServices.Marshal.SizeOf(xType);
+            xSize = xType switch {
+                Type t when t == typeof(DateTime)    => sizeof(int),
+                Type t when t == typeof(HighPrecTime) => sizeof(long),
+                _ => System.Runtime.InteropServices.Marshal.SizeOf(xType)
+            };
             ySize = System.Runtime.InteropServices.Marshal.SizeOf(yType);
 
             xSerializer = GetSerializer(xType);
@@ -73,7 +77,9 @@ namespace SAApi.Data
             if (type == typeof(float))
                 return (s, o) => BitConverter.TryWriteBytes(s, (float)o);
             if (type == typeof(DateTime))
-                return (s, o) => BitConverter.TryWriteBytes(s, (int)((DateTimeOffset)(DateTime)o).ToUnixTimeSeconds());
+                return (s, o) => BitConverter.TryWriteBytes(s, ((DateTime)o).ToMinuteRepre());
+            if (type == typeof(HighPrecTime))
+                return (s, o) => BitConverter.TryWriteBytes(s, ((HighPrecTime)o).ToLongRepresentation());
             
             throw new Exception("Unsupported type");
         }

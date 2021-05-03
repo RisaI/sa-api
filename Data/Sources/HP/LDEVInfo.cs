@@ -10,11 +10,6 @@ namespace SAApi.Data.Sources.HP
         public string MPU { get; set; }
         public string PoolName { get; set; }
 
-        // public IEnumerable<string> Hostnames { get { return HostPorts.Select(h => h.Hostname).Distinct(); } }
-        // public IEnumerable<string> Ports { get { return HostPorts.Select(w => w.Port); } }
-        // public IEnumerable<string> WwnNames { get { return Wwns.Select(w => w.WWN); } }
-        // public IEnumerable<string> WwnNicknames { get { return Wwns.Select(w => w.Nickname); } }
-
         public HostPort[] HostPorts { get; set; }
         public WWNInfo[] Wwns { get; set; }
 

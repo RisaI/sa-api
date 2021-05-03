@@ -90,7 +90,7 @@ namespace SAApi.Data
         {
             if (value is DateTime date)
             {
-                writer.WriteNumberValue(((DateTimeOffset)date).ToUnixTimeSeconds());
+                writer.WriteNumberValue(date.ToMinuteRepre());
             }
             else
             {
@@ -103,6 +103,7 @@ namespace SAApi.Data
     {
         public static readonly Dictionary<Type, string> KnownTypes = new Dictionary<Type, string>() {
             { typeof(DateTime), "datetime" },
+            { typeof(HighPrecTime), "time64" },
 
             { typeof(byte), "byte" },
             { typeof(bool), "boolean" },

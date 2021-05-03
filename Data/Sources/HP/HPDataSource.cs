@@ -248,27 +248,23 @@ namespace SAApi.Data.Sources.HP
             if (feature == "ldev_map")
             {
                 var @params = await JsonSerializer.DeserializeAsync<LDEVMapRequest>(body);
-                var ids = string.IsNullOrWhiteSpace(@params.Id) ? @params.Ids : new string[] { @params.Id };
+                var ids = string.IsNullOrWhiteSpace(@params.Id) ? @params.Ids.ToHashSet() : new HashSet<string> { @params.Id };
 
                 switch (@params.Mode)
                 {
                     case "port":
-                        return null;
+                        return LDEVs.Select(l => l.HostPorts.Any(h => ids.Contains(h.Port)));
                     case "mpu":
-                        return null;
+                        return LDEVs.Select(l => ids.Contains(l.MPU));
                     case "pool":
-                        return null;
+                        return LDEVs.Select(l => ids.Contains(l.PoolName));
                     case "wwn":
-                        return null;
+                        return LDEVs.Select(l => l.Wwns.Any(w => ids.Contains(w.Wwn)));
+                    case "hostgroup":
+                        return LDEVs.Select(l => l.Wwns.Any(w => ids.Contains(w.Hostgroup)));
                     case "ldev":
                     default:
-                        return @params.Ids
-                            .Select(i =>
-                                LDEVs.FirstOrDefault(l => 
-                                    l.Id.Equals(i.Substring(0, Math.Min(i.Length, 8)), StringComparison.InvariantCultureIgnoreCase)
-                                )
-                            )
-                            .Where(l => l != null);
+                        return LDEVs.Select(l => ids.Contains(l.Id));
                 }
 
                 

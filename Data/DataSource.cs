@@ -10,6 +10,7 @@ namespace SAApi.Data
     {
         public abstract IEnumerable<Dataset> Datasets { get; }
         public abstract IEnumerable<string> Features { get; }
+        public Dictionary<string, string> Metadata { get; }
 
         public string Id { get; private set; }
         public string Name { get { return _Config["name"] ?? _DefaultName; } }
@@ -23,6 +24,7 @@ namespace SAApi.Data
             Id = id;
             _DefaultName = defaultName;
             _Config = config;
+            Metadata = new Dictionary<string, string>();
         }
 
         public abstract Task<Node> GetNode(string id, string variant, Services.ResourceCache resCache);

@@ -22,7 +22,7 @@ namespace SAApi.Data.Sources.HP
         public HPDataSource(string id, IConfigurationSection config)
             : base(id, "Disková pole HP", config)
         {
-
+            Metadata.Add("path", DataPath);
         }
 
         private List<HPDataset> _Datasets = new List<HPDataset>();
@@ -46,6 +46,8 @@ namespace SAApi.Data.Sources.HP
         public override async Task OnTick(IServiceScope scope)
         {
             // ? LDEVEachOfCU_dat
+
+            Metadata["path"] = DataPath;
 
             Ranges = Directory.GetDirectories(DataPath, "PFM_*")
                 .Select(d => {

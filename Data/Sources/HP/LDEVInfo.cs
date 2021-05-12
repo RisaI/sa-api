@@ -1,4 +1,5 @@
 
+using System.Collections.Generic;
 using System.Linq;
 
 namespace SAApi.Data.Sources.HP
@@ -12,17 +13,20 @@ namespace SAApi.Data.Sources.HP
         public string MPU { get; set; }
         public string PoolName { get; set; }
 
-        public HostPort[] HostPorts { get; set; }
-        public WWNInfo[] Wwns { get; set; }
+        public List<HostPort> HostPorts { get; set; }
+        public List<WWNInfo> Wwns { get; set; }
 
         public LDEVInfo(string[] csvColumns)
         {
             ECCGroup = csvColumns[0];
-            Id = csvColumns[1];
+            Id = csvColumns[1].ToLowerInvariant();
             Name = csvColumns[2];
             Size = float.Parse(csvColumns[7], System.Globalization.CultureInfo.InvariantCulture);
             MPU = csvColumns[15].Split(';').Last();
             PoolName = csvColumns[18];
+
+            HostPorts = new();
+            Wwns = new();
         }
     }
 

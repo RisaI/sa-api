@@ -11,7 +11,7 @@ namespace SAApi.Data.Sources.HP
 {
     public class DirectoryMap
     {
-        public const string MapFileName = ".client-map.json";
+        public const string MapFileName = ".client-map.json", ConfigFileName = "config.zip";
         public static readonly string[] DetectedFilePatterns = new string[] { "LDEV_*.ZIP", "LDEV_Short.zip", "*_dat.ZIP" };
 
         [JsonIgnore] public string Root { get; set; } = string.Empty;
@@ -21,6 +21,9 @@ namespace SAApi.Data.Sources.HP
         public Dictionary<string, CsvMeta> Metas { get; set; } = new Dictionary<string, CsvMeta>();
 
         [JsonIgnore] public string MapFile => Path.Combine(Root, MapFileName);
+
+        [JsonIgnore] public bool HasConfigFile => OmittedFiles.Contains(ConfigFileName);
+        [JsonIgnore] public string ConfigFile => Path.Combine(Root, ConfigFileName);
 
         private (DateTime, DateTime)? _TimeRange;
         public (DateTime From, DateTime To) TimeRange

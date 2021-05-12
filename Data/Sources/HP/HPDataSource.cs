@@ -119,13 +119,11 @@ namespace SAApi.Data.Sources.HP
                 var recentDate = maps.Max(m => m.TimeRange.To);
                 var latestPath = maps.First(m => m.TimeRange.To == recentDate).Root;
 
-                var configs = new string[] {
-                    Path.Combine(latestPath, "config.zip"),
-                    Path.Combine(DataPath, "config.zip"),
-                };
-                var availableConf = configs.FirstOrDefault(p => File.Exists(p));
+                var globalConf = Path.Combine(DataPath, "config.zip");
 
-                if (availableConf != null)
+                var availableConf = maps.Select(m => m.ConfigFile).Prepend(globalConf).Where(f => File.Exists(f));
+
+                if (availableConf.Any())
                 {
                     this.LDEVs = await LoadConfig(availableConf);
                     _Features = new string[] { LdevMapFeature };
@@ -145,14 +143,19 @@ namespace SAApi.Data.Sources.HP
             }
         }
 
-        static async Task<List<LDEVInfo>> LoadConfig(string path)
+        static async Task<List<LDEVInfo>> LoadConfig(IEnumerable<string> paths)
         {
-            List<LDEVInfo> ldevs = new List<LDEVInfo>();
+            Dictionary<string, LDEVInfo> ldevs = new();
+            List<LDEVInfo> currentLdevs = new();
 
             // Load configuration
-            using (var file = new FileStream(path, FileMode.Open, FileAccess.Read))
-            using (var zip = new ZipArchive(file, ZipArchiveMode.Read))
+            foreach (var path in paths)
             {
+                currentLdevs.Clear();
+
+                using var file = new FileStream(path, FileMode.Open, FileAccess.Read);
+                using var zip = new ZipArchive(file, ZipArchiveMode.Read);
+                
                 using (var csvFile = zip.GetEntry("LdevInfo.csv").Open())
                 using (var reader = new StreamReader(csvFile))
                 {
@@ -160,36 +163,40 @@ namespace SAApi.Data.Sources.HP
                     await reader.ReadLineAsync(); // Skip first two lines
 
                     while (!reader.EndOfStream)
-                        ldevs.Add(new LDEVInfo((await reader.ReadLineAsync()).Split(',')));
+                    {
+                        var ldev = new LDEVInfo((await reader.ReadLineAsync()).Split(','));
+
+                        currentLdevs.Add(ldev);
+
+                        if (ldevs.ContainsKey(ldev.Id))
+                            ldevs[ldev.Id] = ldev;
+                        else
+                            ldevs.Add(ldev.Id, ldev);
+                    }
                 }
 
                 var hostWWNs = new Dictionary<string, List<WWNInfo>>();
                 using (var csvFile = zip.GetEntry("LunInfo.csv").Open())
                 using (var reader = new StreamReader(csvFile))
                 {
-                    var ldevHostsMap = ldevs.ToDictionary(k => k.Id, v => new List<HostPort>());
-
                     await reader.ReadLineAsync();
                     await reader.ReadLineAsync();
 
                     while (!reader.EndOfStream)
                     {
                         var cols = (await reader.ReadLineAsync()).Split(',');
-                        if (string.IsNullOrWhiteSpace(cols[5]) || !ldevHostsMap.ContainsKey(cols[5]))
+                        if (string.IsNullOrWhiteSpace(cols[5]) || !ldevs.ContainsKey(cols[5]))
                             continue;
 
-                        var ldev = ldevHostsMap[cols[5]];
+                        var ldev = ldevs[cols[5]];
                         var host = new HostPort(cols[1], cols[0]);
                         var hostAlias = $"{host.Hostgroup}:{host.Port}";
 
                         if (!hostWWNs.ContainsKey(hostAlias))
                             hostWWNs.Add(hostAlias, new List<WWNInfo>());
 
-                        ldev.Add(host);
+                        ldev.HostPorts.Add(host);
                     }
-
-                    foreach (var ldev in ldevs)
-                        ldev.HostPorts = ldevHostsMap[ldev.Id].Distinct().ToArray();
                 }
 
                 var wwns = new List<WWNInfo>();
@@ -210,11 +217,11 @@ namespace SAApi.Data.Sources.HP
                     }
                 }
 
-                foreach (var ldev in ldevs)
-                    ldev.Wwns = ldev.HostPorts.SelectMany(hp => hostWWNs[$"{hp.Hostgroup}:{hp.Port}"]).ToArray();
+                foreach (var ldev in currentLdevs)
+                    ldev.Wwns = ldev.HostPorts.SelectMany(hp => hostWWNs[$"{hp.Hostgroup}:{hp.Port}"]).ToList();
             }
 
-            return ldevs;
+            return ldevs.Values.ToList();
         }
 
         async Task ScanZipVariants(string directory, string zipPath, Dictionary<string, List<string>> output)

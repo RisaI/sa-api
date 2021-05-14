@@ -1,5 +1,6 @@
 
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace SAApi.Data.Sources.HP
@@ -9,24 +10,55 @@ namespace SAApi.Data.Sources.HP
         public string ECCGroup { get; set; }
         public string Id { get; set; }
         public string Name { get; set; }
+        public LdevType Type { get; set; }
         public float Size { get; set; }
         public string MPU { get; set; }
-        public string PoolName { get; set; }
+        public Pool? Pool { get; set; }
 
         public List<HostPort> HostPorts { get; set; }
         public List<WWNInfo> Wwns { get; set; }
 
-        public LDEVInfo(string[] csvColumns)
+        public LDEVInfo(string[] csvRow)
         {
-            ECCGroup = csvColumns[0];
-            Id = csvColumns[1].ToLowerInvariant();
-            Name = csvColumns[2];
-            Size = float.Parse(csvColumns[7], System.Globalization.CultureInfo.InvariantCulture);
-            MPU = csvColumns[15].Split(';').Last();
-            PoolName = csvColumns[18];
+            ECCGroup = csvRow[0];
+            Id = csvRow[1].ToLowerInvariant();
+            Name = csvRow[2];
+            Size = float.Parse(csvRow[7], CultureInfo.InvariantCulture);
+            MPU = csvRow[15].Split(';').Last();
+
+            Type = csvRow[4] switch {
+                "Basic" => LdevType.Basic,
+                "Dynamic Provisioning" => LdevType.Dynamic,
+                "External" => LdevType.External,
+                _ => LdevType.Unknown,
+            };
 
             HostPorts = new();
             Wwns = new();
+        }
+
+        public static (int? PoolId, string PoolName) GetPoolInfo(string[] csvRow) {
+            return (int.TryParse(csvRow[10], NumberStyles.Any, CultureInfo.InvariantCulture, out var id) ? id : null, csvRow[18]);
+        }
+    }
+
+    public enum LdevType {
+        Basic,
+        Dynamic,
+        External,
+        Unknown,
+    }
+
+    public class Pool {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public HashSet<string> EccGroups { get; set; }
+
+        public Pool(int id, string name, params string[] eccGroups)
+        {
+            Id = id;
+            Name = name;
+            EccGroups = new HashSet<string>(eccGroups ?? Enumerable.Empty<string>());
         }
     }
 

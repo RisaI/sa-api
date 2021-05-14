@@ -146,6 +146,7 @@ namespace SAApi.Data.Sources.HP
         static async Task<List<LDEVInfo>> LoadConfig(IEnumerable<string> paths)
         {
             Dictionary<string, LDEVInfo> ldevs = new();
+            Dictionary<int, Pool> pools = new();
             List<LDEVInfo> currentLdevs = new();
 
             // Load configuration
@@ -164,7 +165,22 @@ namespace SAApi.Data.Sources.HP
 
                     while (!reader.EndOfStream)
                     {
-                        var ldev = new LDEVInfo((await reader.ReadLineAsync()).Split(','));
+                        var row = (await reader.ReadLineAsync()).Split(',');
+                        var ldev = new LDEVInfo(row);
+                        var (_poolId, poolName) = LDEVInfo.GetPoolInfo(row);
+
+                        if (_poolId != null)
+                        {
+                            var poolId = _poolId.Value;
+
+                            if (!pools.ContainsKey(poolId))
+                                pools.Add(poolId, new Pool(poolId, poolName));
+
+                            ldev.Pool = pools[poolId];
+
+                            if (ldev.ECCGroup != "-" && !ldev.Pool.EccGroups.Contains(ldev.ECCGroup))
+                                ldev.Pool.EccGroups.Add(ldev.ECCGroup);
+                        }
 
                         currentLdevs.Add(ldev);
 
@@ -262,8 +278,8 @@ namespace SAApi.Data.Sources.HP
                 return LDEVs.Where(@params.Mode switch {
                     "port"      => l => l.HostPorts.Any(h => ids.Contains(h.Port)),
                     "mpu"       => l => ids.Contains(l.MPU),
-                    "ecc"       => l => ids.Contains(l.ECCGroup),
-                    "pool"      => l => ids.Contains(l.PoolName),
+                    "ecc"       => l => l.Pool.EccGroups.Any(e => ids.Contains(e)),
+                    "pool"      => l => ids.Contains(l.Pool.Name),
                     "wwn"       => l => l.Wwns.Any(w => ids.Contains(w.Wwn)),
                     "hostgroup" => l => l.Wwns.Any(w => ids.Contains(w.Hostgroup)),
                     "ldev" or _ => l => ids.Contains(l.Id)
@@ -271,6 +287,23 @@ namespace SAApi.Data.Sources.HP
             }
             else
                 throw new NotImplementedException();
+        }
+
+        private async Task<IEnumerable<string>> RecommendVariants(string id, DataRange range)
+        {
+            var dataset = this.Datasets.First(d => d.Id == id) as HPDataset;
+            var bound = DataRange.BoundingBox(dataset.DataRange);
+
+            if (!bound.Contains(range)) return Enumerable.Empty<string>();
+
+            foreach (var dir in Ranges.Where(r => r.Range.Intersection(range) != null))
+            {
+                // TODO: Load maps
+                // TODO: iterate maps
+                // TODO: - if contains CSV meta flatmap headers to get variants
+            }
+
+            return Enumerable.Empty<string>();
         }
 
         public override async Task GetBulkData(string id, IEnumerable<string> variant, DataRange range, Stream stream)

@@ -278,8 +278,8 @@ namespace SAApi.Data.Sources.HP
                 return LDEVs.Where(@params.Mode switch {
                     "port"      => l => l.HostPorts.Any(h => ids.Contains(h.Port)),
                     "mpu"       => l => ids.Contains(l.MPU),
-                    "ecc"       => l => l.Pool.EccGroups.Any(e => ids.Contains(e)),
-                    "pool"      => l => ids.Contains(l.Pool.Name),
+                    "ecc"       => l => l.Pool != null && l.Pool.EccGroups.Any(e => ids.Contains(e)),
+                    "pool"      => l => l.Pool != null && ids.Contains(l.Pool.Name),
                     "wwn"       => l => l.Wwns.Any(w => ids.Contains(w.Wwn)),
                     "hostgroup" => l => l.Wwns.Any(w => ids.Contains(w.Hostgroup)),
                     "ldev" or _ => l => ids.Contains(l.Id)

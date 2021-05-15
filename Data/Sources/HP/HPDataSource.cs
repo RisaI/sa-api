@@ -13,7 +13,7 @@ namespace SAApi.Data.Sources.HP
 {
     public class HPDataSource : DataSource
     {
-        public const string DateFormat = "yyyy/MM/dd HH:mm", DirectoryDateFormat = "yyyyMMdd", LdevMapFeature = "ldev_map";
+        public const string DateFormat = "yyyy/MM/dd HH:mm", DirectoryDateFormat = "yyyyMMdd";
         public static readonly string[] DetectedPatterns = new string[] { "LDEV_*.zip", "Phy*_dat.ZIP", "Port_*.ZIP" };
 
         string DataPath { get { return _Config["path"]; } }
@@ -23,18 +23,14 @@ namespace SAApi.Data.Sources.HP
             : base(id, "Disková pole HP", config)
         {
             Metadata.Add("path", DataPath);
+
+            // Register features
+            RegisterFeature<LDEVMapRequest, IEnumerable<LDEVInfo>>(DataSource.FeatureNames.LDEVMap, LdevMapFeature, () => LDEVs.Count > 0);
+            RegisterFeature<VariantRecommendRequest, IEnumerable<string>>(DataSource.FeatureNames.VariantRecommend, RecommendVariants, null);
         }
 
         private List<HPDataset> _Datasets = new List<HPDataset>();
-        private string[] _Features = new string[0];
-
         public override IEnumerable<Dataset> Datasets => _Datasets;
-        public override IEnumerable<string> Features => GetFeatures();
-
-        private IEnumerable<string> GetFeatures() {
-            if (this.LDEVs.Count > 0) yield return LdevMapFeature;
-            yield return "variant_recommend";
-        }
 
         public IEnumerable<DateTime> GetAvailableDates { get { return Directory.GetDirectories(DataPath).Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null)); } }
         public string GetPathFromDate(DateTime date) => Path.Combine(DataPath, $"PFM_{date.ToString(DirectoryDateFormat)}");
@@ -266,14 +262,12 @@ namespace SAApi.Data.Sources.HP
             }
         }
 
-        public override async Task<object> ActivateFeatureAsync(string feature, Stream body)
+        Task<IEnumerable<LDEVInfo>> LdevMapFeature(LDEVMapRequest @params, Microsoft.AspNetCore.Http.HttpRequest request)
         {
-            if (feature == LdevMapFeature)
-            {
-                var @params = await JsonSerializer.DeserializeAsync<LDEVMapRequest>(body);
-                var ids = @params.Ids.ToHashSet();
+            var ids = @params.Ids.ToHashSet();
 
-                return LDEVs.Where(@params.Mode switch {
+            return Task.FromResult(
+                LDEVs.Where(@params.Mode switch {
                     "port"      => l => l.HostPorts.Any(h => ids.Contains(h.Port)),
                     "mpu"       => l => ids.Contains(l.MPU),
                     "ecc"       => l => l.Pool != null && l.Pool.EccGroups.Any(e => ids.Contains(e)),
@@ -281,35 +275,30 @@ namespace SAApi.Data.Sources.HP
                     "wwn"       => l => l.Wwns.Any(w => ids.Contains(w.Wwn)),
                     "hostgroup" => l => l.Wwns.Any(w => ids.Contains(w.Hostgroup)),
                     "ldev" or _ => l => ids.Contains(l.Id)
-                });
-            }
-            else if (feature == "variant_recommend")
-            {
-                var @params = await JsonSerializer.DeserializeAsync<VariantRecommendRequest>(body);
-                var dataset = this._Datasets.FirstOrDefault(d => d.Id == @params.Id);
-                
-                var range = Data.DataRange.Create(Helper.ParseRange(
-                    dataset.XType,
-                    @params.From,
-                    @params.To
-                ));
-
-                return RecommendVariants(dataset, range);
-            }
-            else
-                throw new NotImplementedException();
+                })
+            );
         }
 
-        private IEnumerable<string> RecommendVariants(HPDataset dataset, DataRange range)
+        Task<IEnumerable<string>> RecommendVariants(VariantRecommendRequest @params, Microsoft.AspNetCore.Http.HttpRequest request)
         {
+            System.Diagnostics.Stopwatch watch = new();
+
+            HPDataset dataset = this._Datasets.FirstOrDefault(d => d.Id == @params.Id);
+            DataRange range = Data.DataRange.Create(Helper.ParseRange(
+                dataset.XType,
+                @params.From,
+                @params.To
+            ));
+
             var bound = DataRange.BoundingBox(dataset.DataRange);
 
-            if (!bound.Contains(range)) return Enumerable.Empty<string>();
+            if (!bound.Contains(range)) return Task.FromResult(Enumerable.Empty<string>());
 
             var hashset = new HashSet<string>();
 
             foreach (var dir in Ranges.Where(r => r.Range.Intersection(range) != null))
             {
+                watch.Restart();
                 var map = DirectoryMap.BuildDirectoryMap(dir.Path);
                 var metaKey = $"{dataset.ZipPath}::{dataset.FileEntry}";
                 
@@ -318,13 +307,17 @@ namespace SAApi.Data.Sources.HP
 
                 var meta = map.Metas[metaKey];
 
+                watch.Stop();
+
+                // Console.WriteLine($"Obtained directory map in {watch.ElapsedMilliseconds}ms");
+
                 foreach (var header in meta.Headers)
                     foreach (var variant in header.VariantsSpan)
                         if (!hashset.Contains(variant))
                             hashset.Add(variant);
             }
 
-            return hashset;
+            return Task.FromResult(hashset.AsEnumerable());
         }
 
         public override async Task GetBulkData(string id, IEnumerable<string> variant, DataRange range, Stream stream)

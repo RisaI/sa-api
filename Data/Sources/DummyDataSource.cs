@@ -14,7 +14,6 @@ namespace SAApi.Data.Sources
         private static Random _Random = new Random();
 
         public override IEnumerable<Dataset> Datasets { get; }
-        public override IEnumerable<string> Features { get { return Enumerable.Empty<string>(); } }
 
         public override string Type => "dummy";
         private float[] SampleData;
@@ -63,11 +62,6 @@ namespace SAApi.Data.Sources
         public override Task OnTick(IServiceScope scope)
         {
             return Task.CompletedTask;
-        }
-
-        public override Task<object> ActivateFeatureAsync(string feature, Stream body)
-        {
-            throw new NotImplementedException();
         }
 
         public override Task GetBulkData(string id, IEnumerable<string> variant, DataRange range, Stream stream)

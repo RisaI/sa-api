@@ -29,7 +29,12 @@ namespace SAApi.Data.Sources.HP
         private string[] _Features = new string[0];
 
         public override IEnumerable<Dataset> Datasets => _Datasets;
-        public override IEnumerable<string> Features => _Features;
+        public override IEnumerable<string> Features => GetFeatures();
+
+        private IEnumerable<string> GetFeatures() {
+            if (this.LDEVs.Count > 0) yield return LdevMapFeature;
+            yield return "variant_recommend";
+        }
 
         public IEnumerable<DateTime> GetAvailableDates { get { return Directory.GetDirectories(DataPath).Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null)); } }
         public string GetPathFromDate(DateTime date) => Path.Combine(DataPath, $"PFM_{date.ToString(DirectoryDateFormat)}");
@@ -124,14 +129,7 @@ namespace SAApi.Data.Sources.HP
                 var availableConf = maps.Select(m => m.ConfigFile).Prepend(globalConf).Where(f => File.Exists(f));
 
                 if (availableConf.Any())
-                {
-                    this.LDEVs = await LoadConfig(availableConf);
-                    _Features = new string[] { LdevMapFeature };
-                }
-                else
-                {
-                    _Features = new string[0];
-                }
+                    LDEVs = await LoadConfig(availableConf);
             }
 
             // Swapnout temp a ostrej
@@ -270,10 +268,10 @@ namespace SAApi.Data.Sources.HP
 
         public override async Task<object> ActivateFeatureAsync(string feature, Stream body)
         {
-            if (feature == "ldev_map")
+            if (feature == LdevMapFeature)
             {
                 var @params = await JsonSerializer.DeserializeAsync<LDEVMapRequest>(body);
-                var ids = string.IsNullOrWhiteSpace(@params.Id) ? @params.Ids.ToHashSet() : new HashSet<string> { @params.Id };
+                var ids = @params.Ids.ToHashSet();
 
                 return LDEVs.Where(@params.Mode switch {
                     "port"      => l => l.HostPorts.Any(h => ids.Contains(h.Port)),
@@ -285,30 +283,53 @@ namespace SAApi.Data.Sources.HP
                     "ldev" or _ => l => ids.Contains(l.Id)
                 });
             }
+            else if (feature == "variant_recommend")
+            {
+                var @params = await JsonSerializer.DeserializeAsync<VariantRecommendRequest>(body);
+                var dataset = this._Datasets.FirstOrDefault(d => d.Id == @params.Id);
+                
+                var range = Data.DataRange.Create(Helper.ParseRange(
+                    dataset.XType,
+                    @params.From,
+                    @params.To
+                ));
+
+                return RecommendVariants(dataset, range);
+            }
             else
                 throw new NotImplementedException();
         }
 
-        private async Task<IEnumerable<string>> RecommendVariants(string id, DataRange range)
+        private IEnumerable<string> RecommendVariants(HPDataset dataset, DataRange range)
         {
-            var dataset = this.Datasets.First(d => d.Id == id) as HPDataset;
             var bound = DataRange.BoundingBox(dataset.DataRange);
 
             if (!bound.Contains(range)) return Enumerable.Empty<string>();
 
+            var hashset = new HashSet<string>();
+
             foreach (var dir in Ranges.Where(r => r.Range.Intersection(range) != null))
             {
-                // TODO: Load maps
-                // TODO: iterate maps
-                // TODO: - if contains CSV meta flatmap headers to get variants
+                var map = DirectoryMap.BuildDirectoryMap(dir.Path);
+                var metaKey = $"{dataset.ZipPath}::{dataset.FileEntry}";
+                
+                if (!map.Metas.ContainsKey(metaKey))
+                    continue;
+
+                var meta = map.Metas[metaKey];
+
+                foreach (var header in meta.Headers)
+                    foreach (var variant in header.VariantsSpan)
+                        if (!hashset.Contains(variant))
+                            hashset.Add(variant);
             }
 
-            return Enumerable.Empty<string>();
+            return hashset;
         }
 
         public override async Task GetBulkData(string id, IEnumerable<string> variant, DataRange range, Stream stream)
         {
-            var dataset = this.Datasets.First(d => d.Id == id) as HPDataset;
+            var dataset = _Datasets.First(d => d.Id == id) as HPDataset;
             var bound = DataRange.BoundingBox(dataset.DataRange);
 
             if (!bound.Contains(range)) return;
@@ -370,10 +391,15 @@ namespace SAApi.Data.Sources.HP
 
     record LDEVMapRequest
     {
-        [JsonPropertyName("id")] public string Id { get; init; }
         [JsonPropertyName("ids")] public string[] Ids { get; init; }
-
         [JsonPropertyName("mode")] public string Mode { get; init; }
+    }
+
+    record VariantRecommendRequest
+    {
+        [JsonPropertyName("id")] public string Id { get; init; }
+        [JsonPropertyName("from")] public string From { get; init; }
+        [JsonPropertyName("to")] public string To { get; init; }
     }
 
     public class HPDataset : Dataset

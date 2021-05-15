@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
+#nullable enable
+
 namespace SAApi.Data.Sources.HP
 {
     public class LDEVInfo
@@ -67,7 +69,6 @@ namespace SAApi.Data.Sources.HP
         public string Hostgroup { get; set; }
         public string Port { get; set; }
 
-        public HostPort() { }
         public HostPort(string hostgroup, string port)
         {
             Hostgroup = hostgroup;

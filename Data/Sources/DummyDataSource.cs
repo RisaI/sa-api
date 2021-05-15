@@ -15,6 +15,7 @@ namespace SAApi.Data.Sources
 
         public override IEnumerable<Dataset> Datasets { get; }
         public override IEnumerable<string> Features { get { return Enumerable.Empty<string>(); } }
+
         public override string Type => "dummy";
         private float[] SampleData;
 
@@ -52,7 +53,7 @@ namespace SAApi.Data.Sources
                 ),
             };
         }
-
+        
         public override Task<Node> GetNode(string id, string variant, Services.ResourceCache _)
         {
             var dataset = Datasets.First(d => d.Id == id) as DummyDataset;

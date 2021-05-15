@@ -46,7 +46,7 @@ namespace SAApi.Controllers
             if (source == null)
                 return NotFound();
 
-            return Ok(await source.ActivateFeatureAsync(feature, Request.Body));
+            return Ok(await source.ActivateFeatureAsync(feature, Request));
         }
 
         [HttpGet("{sourceId}/{setId}")]

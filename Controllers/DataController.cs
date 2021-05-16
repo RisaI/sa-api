@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -104,16 +103,10 @@ namespace SAApi.Controllers
         public async Task GetPipelineData([FromBody] FetchDataRequest body)
         {
             Response.ContentType = "application/octet-stream";
-            var watch = new Stopwatch();
 
-            watch.Start();
             var pipelines = await Task.WhenAll(body.Pipelines.Select(p =>
                 Data.Pipes.PipelineCompiler.Compile(p, _DataSources, _ResCache)));
-            watch.Stop();
 
-            _Logger.LogDebug($"Compiled the pipelines in {watch.ElapsedMilliseconds} ms.");
-
-            watch.Restart();
             // Parse and apply X range
             foreach (var pipeline in pipelines)
             {
@@ -125,21 +118,15 @@ namespace SAApi.Controllers
                     )
                 );
             }
-            watch.Stop();
-
-            _Logger.LogDebug($"Applied an x range to the pipeline in {watch.ElapsedMilliseconds} ms.");
 
             using (var encoder = new Data.BinaryDataBuffer())
             {
                 // Drain the pipeline into a stream
-                watch.Restart();
                 foreach (var pipeline in pipelines)
                 {
                     await encoder.Consume(pipeline);
                     await encoder.FlushAsync(Response.Body);
                 }
-                watch.Stop();
-                _Logger.LogDebug($"Consumed the pipeline in {watch.ElapsedMilliseconds} ms.");
             }
 
             await Response.CompleteAsync();

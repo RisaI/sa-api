@@ -281,8 +281,6 @@ namespace SAApi.Data.Sources.HP
 
         Task<IEnumerable<string>> RecommendVariants(VariantRecommendRequest @params, Microsoft.AspNetCore.Http.HttpRequest request)
         {
-            System.Diagnostics.Stopwatch watch = new();
-
             HPDataset dataset = this._Datasets.FirstOrDefault(d => d.Id == @params.Id);
             DataRange range = Data.DataRange.Create(Helper.ParseRange(
                 dataset.XType,
@@ -298,17 +296,12 @@ namespace SAApi.Data.Sources.HP
 
             foreach (var dir in Ranges.Where(r => r.Range.Intersection(range) != null))
             {
-                watch.Restart();
                 var map = DirectoryMap.BuildDirectoryMap(dir.Path);
                 
                 if (!map.Zips.ContainsKey(dataset.ZipPath) || !map.Zips[dataset.ZipPath].ContainsKey(dataset.FileEntry))
                     continue;
 
                 var meta = map.Zips[dataset.ZipPath][dataset.FileEntry];
-
-                watch.Stop();
-
-                Console.WriteLine($"Obtained directory map in {watch.ElapsedMilliseconds}ms");
 
                 foreach (var header in meta.Headers)
                     foreach (var variant in header.VariantsSpan)
@@ -432,9 +425,9 @@ namespace SAApi.Data.Sources.HP
             ("_Update_Copy_Response", "ms"),
             ("_Initial_Copy_Response", "ms"),
             ("_Pair_Synchronized", "percent"),
-            ("_Update_Copy_RIO", "IOP/s"),
+            ("_Update_Copy_RIO", "IO/s"),
             ("PhyMPPK", "percent"),
-            ("iops", "IOP/s"),
+            ("iops", "IO/s"),
             ("mb/s", "MB/s"),
             ("mb", "MB"),
             ("kbps", "kB/s"),

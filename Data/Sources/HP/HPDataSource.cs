@@ -72,7 +72,7 @@ namespace SAApi.Data.Sources.HP
             {
                 Ranges.Add((DataRange.Create(map.TimeRange), map.Root));
 
-                foreach (var zip in map.PhysicalFiles)
+                foreach (var zip in map.ZipFiles)
                 {
                     if (zip.StartsWith("LDEVEachOfCU_dat"))
                         continue;
@@ -85,7 +85,7 @@ namespace SAApi.Data.Sources.HP
                     map.OpenLocalZip(zip, archive => {
                         foreach (var entry in archive.Entries) {
                             var range = map.TimeRange;
-                            var variants = map.Metas[$"{zip}::{entry.FullName}"].Headers.SelectMany(h => h.VariantsSpan.ToArray());
+                            var variants = map.Zips[zip][entry.FullName].Headers.SelectMany(h => h.VariantsSpan.ToArray());
                             var id = Path.GetFileNameWithoutExtension(entry.FullName);
 
                             var prev = _temp.FirstOrDefault(ds => ds.Id == id);
@@ -300,16 +300,15 @@ namespace SAApi.Data.Sources.HP
             {
                 watch.Restart();
                 var map = DirectoryMap.BuildDirectoryMap(dir.Path);
-                var metaKey = $"{dataset.ZipPath}::{dataset.FileEntry}";
                 
-                if (!map.Metas.ContainsKey(metaKey))
+                if (!map.Zips.ContainsKey(dataset.ZipPath) || !map.Zips[dataset.ZipPath].ContainsKey(dataset.FileEntry))
                     continue;
 
-                var meta = map.Metas[metaKey];
+                var meta = map.Zips[dataset.ZipPath][dataset.FileEntry];
 
                 watch.Stop();
 
-                // Console.WriteLine($"Obtained directory map in {watch.ElapsedMilliseconds}ms");
+                Console.WriteLine($"Obtained directory map in {watch.ElapsedMilliseconds}ms");
 
                 foreach (var header in meta.Headers)
                     foreach (var variant in header.VariantsSpan)

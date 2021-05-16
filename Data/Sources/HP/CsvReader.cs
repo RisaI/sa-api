@@ -148,6 +148,23 @@ namespace SAApi.Data.Sources.HP
 
                 return new CsvHeader(lineNumber, Split().ToArray());
             }
+
+            public void Serialize(BinaryWriter writer)
+            {
+                writer.Write7BitEncodedInt64(Line);
+                writer.Write7BitEncodedInt(Columns.Length);
+                foreach (var col in Columns) writer.Write(col);
+            }
+
+            public static CsvHeader Deserialize(BinaryReader reader)
+            {
+                return new CsvHeader(
+                    reader.Read7BitEncodedInt64(),
+                    Enumerable.Range(0, reader.Read7BitEncodedInt())
+                        .Select(i => reader.ReadString())
+                        .ToArray()
+                );
+            }
         }
 
 #region Static

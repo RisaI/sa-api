@@ -55,5 +55,32 @@ namespace SAApi.Data.Sources.HP
         {
             writer.WriteLine(string.Join(',', Headers[headerIdx]));
         }
+
+        public void Serialize(BinaryWriter writer)
+        {
+            writer.Write(Name);
+            writer.Write(SerialNumber);
+            writer.Write(From.Ticks);
+            writer.Write(To.Ticks);
+            writer.Write7BitEncodedInt(SamplingRate);
+
+            writer.Write7BitEncodedInt(Headers.Length);
+            foreach (var header in Headers) header.Serialize(writer);
+        }
+
+        public static CsvMeta Deserialize(BinaryReader reader)
+        {
+            return new CsvMeta(
+                reader.ReadString(),
+                reader.ReadString(),
+                new DateTime(reader.ReadInt64()),
+                new DateTime(reader.ReadInt64()),
+                reader.Read7BitEncodedInt(),
+
+                Enumerable.Range(0, reader.Read7BitEncodedInt())
+                    .Select(i => CsvReader.CsvHeader.Deserialize(reader))
+                    .ToArray()
+            );
+        }
     }
 }

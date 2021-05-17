@@ -117,12 +117,8 @@ namespace SAApi.Data.Sources.HP
             _temp.ForEach(t => t.DataRange = DataRange.Simplify(t.DataRange));
 
             {
-                var recentDate = maps.Max(m => m.TimeRange.To);
-                var latestPath = maps.First(m => m.TimeRange.To == recentDate).Root;
-
                 var globalConf = Path.Combine(DataPath, "config.zip");
-
-                var availableConf = maps.Select(m => m.ConfigFile).Prepend(globalConf).Where(f => File.Exists(f));
+                var availableConf = maps.Select(m => m.ConfigFile).TakeLast(1).Prepend(globalConf).Where(f => File.Exists(f));
 
                 if (availableConf.Any())
                     LDEVs = await LoadConfig(availableConf);

@@ -64,10 +64,28 @@ namespace SAApi.Data.Sources
             return Task.CompletedTask;
         }
 
-        public override Task GetBulkData(string id, IEnumerable<string> variant, DataRange range, Stream stream)
+        public override async Task GetBulkData(string id, IEnumerable<string> variant, DataRange range, Stream stream)
         {
-            // TODO:
-            throw new NotImplementedException();
+            var (from, to) = range.ToTuple<DateTime>();
+            var dataset = Datasets.First(d => d.Id == id) as DummyDataset;
+            var bounds  = dataset.DataRange.BoundingBox();
+
+            if (range.Intersection(bounds) != null)
+            {
+                var buffer = new byte[sizeof(int) + sizeof(float)];
+
+                void SerializeFloat (float data,  int idx) => BitConverter.TryWriteBytes(buffer.AsSpan(idx, sizeof(float)), data);
+                void SerializeDate(DateTime date, int idx) => BitConverter.TryWriteBytes(buffer.AsSpan(idx, sizeof(int)), date.ToMinuteRepre());
+
+                while (from <= to) {
+                    
+                    SerializeDate(from, 0);
+                    SerializeFloat(dataset.Func.Invoke(from, (int)((from - (DateTime)bounds.From) / dataset.Jump)), sizeof(int));
+
+                    await stream.WriteAsync(buffer, 0, buffer.Length);
+                    from += dataset.Jump;
+                }        
+            }
         }
 
         public class DummyDataset : Dataset

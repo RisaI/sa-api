@@ -34,7 +34,7 @@ namespace SAApi.Data
         [JsonIgnore]
         public string[] Variants { get; set; }
 
-        public int VariantCount => Variants?.Length ?? 1;
+        public int VariantCount => Variants.Length;
 
         public Dataset(string id, string[] category, string? units, IIdentified source, Type xType, Type yType, IEnumerable<DataRange> xRange, params string[] variants)
         {
@@ -47,7 +47,7 @@ namespace SAApi.Data
 
             DataRange = xRange;
 
-            Variants = variants;
+            Variants = variants?.Length > 0 ? variants : new string[] { id };
 
             // TODO: custom exception
             if (xRange.Any(r => r.Type != XType))

@@ -29,14 +29,14 @@ namespace SAApi.Data
         public Type YType { get; set; }
 
         [JsonConverter(typeof(RangeTupleConverter))]
-        public IEnumerable<DataRange> DataRange { get; set; }
+        public List<DataRange> DataRange { get; set; }
 
         [JsonIgnore]
-        public string[] Variants { get; set; }
+        public HashSet<string> Variants { get; set; }
 
-        public int VariantCount => Variants.Length;
+        public int VariantCount => Variants.Count;
 
-        public Dataset(string id, string[] category, string? units, IIdentified source, Type xType, Type yType, IEnumerable<DataRange> xRange, params string[] variants)
+        public Dataset(string id, string[] category, string? units, IIdentified source, Type xType, Type yType, IEnumerable<DataRange> xRange, IEnumerable<string>? variants)
         {
             Id = id;
             Category = category;
@@ -45,9 +45,9 @@ namespace SAApi.Data
             XType = xType;
             YType = yType;
 
-            DataRange = xRange;
+            DataRange = xRange.ToList();
 
-            Variants = variants?.Length > 0 ? variants : new string[] { id };
+            Variants = variants?.Any() == true ? variants.ToHashSet() : new () { id };
 
             // TODO: custom exception
             if (xRange.Any(r => r.Type != XType))

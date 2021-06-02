@@ -1,9 +1,9 @@
-
+using System.Collections.Generic;
 
 namespace SAApi.Models
 {
     public record BulkDataRequest(
-        string[] Variants,
+        IEnumerable<string> Variants,
         
         string From,
         string To

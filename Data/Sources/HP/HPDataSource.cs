@@ -102,19 +102,20 @@ namespace SAApi.Data.Sources.HP
                                         typeof(DateTime),
                                         typeof(int),
                                         map.TimeRange,
-                                        variants.ToArray()
+                                        variants
                                     ) { ZipPath = zip, FileEntry = entry.FullName });
                                 }
                             } else {
-                                prev.DataRange = prev.DataRange.Append(DataRange.Create(range));
-                                prev.Variants = prev.Variants.Concat(variants).Distinct().ToArray();
+                                prev.DataRange.Add(DataRange.Create(range));
+                                foreach (var v in variants)
+                                    prev.Variants.Add(v);
                             }
                         }
                     });
                 }
             }
 
-            _temp.ForEach(t => t.DataRange = DataRange.Simplify(t.DataRange));
+            _temp.ForEach(t => t.DataRange = DataRange.Simplify(t.DataRange).ToList());
 
             {
                 var globalConf = Path.Combine(DataPath, "config.zip");
@@ -398,7 +399,7 @@ namespace SAApi.Data.Sources.HP
             Type xType,
             Type yType,
             (DateTime From, DateTime To) xRange,
-            params string[] variants
+            IEnumerable<string> variants
             
             ) : base(id, category, units, source, xType, yType, new [] { Data.DataRange.Create(xRange) }, variants)
         {

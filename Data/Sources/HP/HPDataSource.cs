@@ -319,6 +319,8 @@ namespace SAApi.Data.Sources.HP
         Task<IEnumerable<string>> RecommendVariants(VariantRecommendRequest @params, Microsoft.AspNetCore.Http.HttpRequest request)
         {
             HPDataset dataset = this._Datasets.FirstOrDefault(d => d.Id == @params.Id);
+            var mppk = dataset as HP_MPPKDataset;
+
             DataRange range = Data.DataRange.Create(Helper.ParseRange(
                 dataset.XType,
                 @params.From,
@@ -329,13 +331,8 @@ namespace SAApi.Data.Sources.HP
 
             if (!bound.Contains(range)) return Task.FromResult(Enumerable.Empty<string>());
 
-            if (dataset is HP_MPPKDataset mppk)
-            {
-                return mppk.Grouping switch {
-                    HP_MPPKDataset.MPPKGrouping.ById => Task.FromResult(Enumerable.Empty<string>()),
-                    _ => Task.FromResult(mppk.Variants.AsEnumerable())
-                };
-            }
+            if (mppk != null && mppk.Grouping != HP_MPPKDataset.MPPKGrouping.ById)
+                return Task.FromResult(mppk.Variants.AsEnumerable());
 
             var hashset = new HashSet<string>();
 
@@ -345,6 +342,24 @@ namespace SAApi.Data.Sources.HP
                 
                 if (!map.Zips.ContainsKey(dataset.ZipPath) || !map.Zips[dataset.ZipPath].ContainsKey(dataset.FileEntry))
                     continue;
+
+                if (mppk != null)
+                {
+                    map.OpenLocalZip(dataset.ZipPath, zip => {
+                        using var reader = new CsvReader(zip.GetEntry(dataset.FileEntry).Open(), false);
+
+                        foreach (var row in reader.ReadNextBlockAsString()) {
+                            foreach (var col in row.Values.Span) {
+                                var split = col.Data.Split(';');
+
+                                if (split.Length <= 1) break;
+
+                                hashset.Add(split[2]); 
+                            }
+                        }
+                    });
+                    continue;
+                }
 
                 var meta = map.Zips[dataset.ZipPath][dataset.FileEntry];
 

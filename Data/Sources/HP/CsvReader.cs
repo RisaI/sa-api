@@ -69,7 +69,6 @@ namespace SAApi.Data.Sources.HP
         CsvHeader _CurrentHeader = null;
         public IEnumerable<(DateTime Time, Memory<(string Variant, int Data)> Values)> ReadNextBlock()
         {
-
             while (!Reader.EndOfStream && _CurrentHeader == null)
             {
                 var line = ReadLine();
@@ -110,6 +109,58 @@ namespace SAApi.Data.Sources.HP
                     row[idx] = (
                         _CurrentHeader.Columns[2 + idx],
                         int.Parse(span.Slice(0, cursor))
+                    );
+
+                    span = span.Slice(Math.Min(span.Length, cursor + 1));
+                    idx += 1;
+                }
+
+                yield return (time, row);
+            }
+        }
+
+        public IEnumerable<(DateTime Time, Memory<(string Variant, string Data)> Values)> ReadNextBlockAsString()
+        {
+            while (!Reader.EndOfStream && _CurrentHeader == null)
+            {
+                var line = ReadLine();
+
+                if (line.StartsWith("\"No.\""))
+                    _CurrentHeader = CsvHeader.Parse(LineNumber - 1, line.AsMemory());
+            }
+
+            if (_CurrentHeader == null) yield break;
+
+            (string, string)[] row = new (string, string)[_CurrentHeader.Columns.Length - 2];
+
+            while (!Reader.EndOfStream)
+            {
+                var line = ReadLine();
+
+                if (line.StartsWith("\"No.\""))
+                {
+                    _CurrentHeader = CsvHeader.Parse(LineNumber - 1, line.AsMemory());
+                    break;
+                }
+
+                ReadOnlySpan<char> span = line.AsSpan(line.IndexOf(',') + 1); // Skip line number
+
+                int cursor = span.IndexOf(',');
+                var time = DateTime.ParseExact(span.Slice(0, cursor).Trim('"'), RangeDateFormat, null);
+                span = span.Slice(++cursor);
+
+                int idx = 0;
+
+                while (span.Length > 0)
+                {
+                    cursor = span.IndexOf(',') switch {
+                        int i when i >= 0 => i,
+                        _ => span.Length,
+                    };
+
+                    row[idx] = (
+                        _CurrentHeader.Columns[2 + idx],
+                        span.Slice(0, cursor).ToString()
                     );
 
                     span = span.Slice(Math.Min(span.Length, cursor + 1));

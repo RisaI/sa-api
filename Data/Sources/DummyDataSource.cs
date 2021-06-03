@@ -16,6 +16,12 @@ namespace SAApi.Data.Sources
         public override IEnumerable<Dataset> Datasets { get; }
 
         public override string Type => "dummy";
+
+        public override IEnumerable<DataRange> Dataranges
+        {
+            get { yield return DataRange.Create(DateTime.Today.AddDays(-300), DateTime.Today); }
+        }
+
         private float[] SampleData;
 
         public DummyDataSource(string id, IConfigurationSection config) : base(id, "Dummy Data Source", config)

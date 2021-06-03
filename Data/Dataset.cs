@@ -28,7 +28,7 @@ namespace SAApi.Data
         [JsonConverter(typeof(AxisTypeConverter))]
         public Type YType { get; set; }
 
-        [JsonConverter(typeof(RangeTupleConverter))]
+        [JsonConverter(typeof(RangeTupleConverter<List<DataRange>>))]
         public List<DataRange> DataRange { get; set; }
 
         [JsonIgnore]
@@ -55,32 +55,35 @@ namespace SAApi.Data
         }
     }
 
-    public class RangeTupleConverter : JsonConverter<IEnumerable<DataRange>>
+    public class RangeTupleConverter<T> : JsonConverter<T?> where T : IEnumerable<DataRange>
     {
-        public override IEnumerable<DataRange> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override T? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            return Enumerable.Empty<DataRange>();
+            return default(T);
         }
 
-        public override void Write(Utf8JsonWriter writer, IEnumerable<DataRange> value, JsonSerializerOptions options)
+        public override void Write(Utf8JsonWriter writer, T? value, JsonSerializerOptions options)
         {
             writer.WriteStartArray();
             
-            foreach (var val in value)
+            if (value != null)
             {
-                writer.WriteStartArray();
+                foreach (var val in value)
+                {
+                    writer.WriteStartArray();
 
-                if (val.From == null)
-                    writer.WriteNullValue();
-                else
-                    WriteValue(writer, val.From, options);
+                    if (val.From == null)
+                        writer.WriteNullValue();
+                    else
+                        WriteValue(writer, val.From, options);
 
-                if (val.To == null)
-                    writer.WriteNullValue();
-                else
-                    WriteValue(writer, val.To, options);
+                    if (val.To == null)
+                        writer.WriteNullValue();
+                    else
+                        WriteValue(writer, val.To, options);
 
-                writer.WriteEndArray();
+                    writer.WriteEndArray();
+                }
             }
 
             writer.WriteEndArray();

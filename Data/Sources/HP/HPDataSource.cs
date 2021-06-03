@@ -15,6 +15,7 @@ namespace SAApi.Data.Sources.HP
     {
         public const string DateFormat = "yyyy/MM/dd HH:mm", DirectoryDateFormat = "yyyyMMdd";
         public static readonly string[] DetectedPatterns = new string[] { "LDEV_*.zip", "Phy*_dat.ZIP", "Port_*.ZIP" };
+        public static readonly string[] MPPKZips = new string[] { "PhyProcDetail_dat.ZIP", "MPPK_dat.ZIP" };
 
         string DataPath { get { return _Config["path"]; } }
         public override string Type => "hp";
@@ -31,6 +32,8 @@ namespace SAApi.Data.Sources.HP
 
         private List<HPDataset> _Datasets = new List<HPDataset>();
         public override IEnumerable<Dataset> Datasets => _Datasets;
+        private List<DataRange> _DataRanges = new List<DataRange>();
+        public override IEnumerable<DataRange> Dataranges => _DataRanges;
 
         public IEnumerable<DateTime> GetAvailableDates { get { return Directory.GetDirectories(DataPath).Select(d => DateTime.ParseExact(Path.GetFileName(d).Substring(4), DirectoryDateFormat, null)); } }
         public string GetPathFromDate(DateTime date) => Path.Combine(DataPath, $"PFM_{date.ToString(DirectoryDateFormat)}");
@@ -65,6 +68,7 @@ namespace SAApi.Data.Sources.HP
                 .ToList();
 
             var availableRange = Ranges.Select(r => r.Range).BoundingBox()?.ToTuple<DateTime>() ?? throw new Exception("Unexpected range type");
+            _DataRanges = DataRange.Simplify(Ranges.Select(r => r.Range)).ToList();
 
             var maps = Ranges.Select(r => r.Path).Select(d => DirectoryMap.BuildDirectoryMap(d)).ToArray();
 
@@ -76,6 +80,42 @@ namespace SAApi.Data.Sources.HP
                 {
                     if (zip.StartsWith("LDEVEachOfCU_dat"))
                         continue;
+
+                    if (Array.IndexOf(MPPKZips, zip) >= 0)
+                    {
+                        map.OpenLocalZip(zip, archive => {
+                            foreach (var entry in archive.Entries) {
+                                var range = map.TimeRange;
+                                var file = Path.GetFileNameWithoutExtension(entry.FullName);
+
+                                foreach (var grouping in Enum.GetValues<HP_MPPKDataset.MPPKGrouping>())
+                                {
+                                    var id = HP_MPPKDataset.CreateId(file, grouping);
+                                    var prev = _temp.FirstOrDefault(ds => ds.Id == id);
+
+                                    if (prev == null) {
+                                        lock (_temp) {
+                                            _temp.Add(new HP_MPPKDataset(
+                                                id,
+                                                new [] { Path.GetFileNameWithoutExtension(zip), file },
+                                                this,
+                                                grouping,
+                                                map.TimeRange,
+                                                HP_MPPKDataset.DefaultVariants(grouping)
+                                            ) { ZipPath = zip, FileEntry = entry.FullName });
+                                        }
+                                    } else {
+                                        prev.DataRange.Add(DataRange.Create(range));
+                                        // TODO: add variants for ById
+                                        // foreach (var v in variants)
+                                        //     prev.Variants.Add(v);
+                                    }
+                                }
+                            }
+                        });
+
+                        continue;
+                    }
 
                     var category = Path.GetDirectoryName(zip) switch {
                         string path when !string.IsNullOrWhiteSpace(path) => path.Split(),
@@ -289,6 +329,14 @@ namespace SAApi.Data.Sources.HP
 
             if (!bound.Contains(range)) return Task.FromResult(Enumerable.Empty<string>());
 
+            if (dataset is HP_MPPKDataset mppk)
+            {
+                return mppk.Grouping switch {
+                    HP_MPPKDataset.MPPKGrouping.ById => Task.FromResult(Enumerable.Empty<string>()),
+                    _ => Task.FromResult(mppk.Variants.AsEnumerable())
+                };
+            }
+
             var hashset = new HashSet<string>();
 
             foreach (var dir in Ranges.Where(r => r.Range.Intersection(range) != null))
@@ -326,10 +374,16 @@ namespace SAApi.Data.Sources.HP
 
             void SerializeInt (int data,      int idx) => BitConverter.TryWriteBytes(buffer.AsSpan(idx, sizeof(int)), data);
             void SerializeDate(DateTime date, int idx) => SerializeInt(date.ToMinuteRepre(), idx);
+            void ClearBuffer(int clearValue = -1) {
+                for (int j = 0; j < buffer.Length / sizeof(int); ++j)
+                    SerializeInt(clearValue, j * sizeof(int));
+            };
             
             foreach (var dir in Ranges.Where(r => r.Range.Intersection(range) != null))
             {
                 var zipPath = Path.Combine(dir.Path, dataset.ZipPath);
+
+                if (!File.Exists(zipPath)) continue;
 
                 using var zipStream = File.Open(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                 using var zip = new ZipArchive(zipStream, ZipArchiveMode.Read);
@@ -345,27 +399,67 @@ namespace SAApi.Data.Sources.HP
                     cursor = cursor.AddMinutes(1);
                 }
 
-                var query = csvReader.ReadNextBlock()
-                    .SkipWhile(row => row.Time < cursor)
-                    .TakeWhile(row => row.Time <= end);
-
-                foreach (var row in query)
+                if (dataset is HP_MPPKDataset mppk)
                 {
-                    // Clear da buffa!
-                    for (int j = 0; j < buffer.Length / sizeof(int); ++j)
-                        SerializeInt(-1, j * sizeof(int));
+                    var query = csvReader.ReadNextBlockAsString()
+                        .SkipWhile(row => row.Time < cursor)
+                        .TakeWhile(row => row.Time <= end);
 
-                    cursor = row.Time;
-                    SerializeDate(cursor, 0);
-                    
-                    var cols = row.Values;
-                    for (i = 0; i < cols.Length; ++i)
+                    var tally = new int[variant.Count()];
+
+                    foreach (var row in query)
                     {
-                        var col = cols.Span[i];
-                        SerializeInt(col.Data, variantMap[col.Variant] * sizeof(int));
-                    }
+                        ClearBuffer(0);
+                        for (int j = 0; j < tally.Length; ++j) tally[j] = 0;
+                        cursor = row.Time;
+                        SerializeDate(cursor, 0);
 
-                    await stream.WriteAsync(buffer);
+                        var cols = row.Values;
+
+                        for (i = 0; i < cols.Length; ++i)
+                        {
+                            var col = cols.Span[i];
+                            var split = col.Data.Split(';');
+
+                            if (split.Length <= 1) continue; // Skip undefined
+
+                            var idx = mppk.Grouping switch {
+                                HP_MPPKDataset.MPPKGrouping.ByKernel => (variantMap[split[0]] - 1),
+                                HP_MPPKDataset.MPPKGrouping.ByType   => (variantMap[split[1]] - 1),
+                                HP_MPPKDataset.MPPKGrouping.ById     => variantMap.ContainsKey(split[2]) ? (variantMap[split[2]] - 1) : -1,
+                                _ => -1
+                            };
+
+                            if (idx >= 0)
+                                tally[idx] += int.Parse(split.Last());
+                        }
+
+                        for (int j = 0; j < tally.Length; ++j)
+                            SerializeInt(tally[j], (j + 1) * sizeof(int));
+
+                        await stream.WriteAsync(buffer);
+                    }
+                }
+                else
+                {
+                    var query = csvReader.ReadNextBlock()
+                        .SkipWhile(row => row.Time < cursor)
+                        .TakeWhile(row => row.Time <= end);
+
+                    foreach (var row in query)
+                    {
+                        ClearBuffer();
+                        cursor = row.Time;
+                        SerializeDate(cursor, 0);
+
+                        var cols = row.Values;
+                        for (i = 0; i < cols.Length; ++i)
+                        {
+                            var col = cols.Span[i];
+                            SerializeInt(col.Data, variantMap[col.Variant] * sizeof(int));
+                        }
+                        await stream.WriteAsync(buffer);
+                    }
                 }
             }
         }
@@ -448,5 +542,50 @@ namespace SAApi.Data.Sources.HP
             ("timeseriestrafficrx", "MB/s"),
             ("timeseriestraffictx", "MB/s"),
         };
+    }
+
+    public class HP_MPPKDataset : HPDataset
+    {
+        public MPPKGrouping Grouping { get; set; }
+
+        public HP_MPPKDataset(
+            string id,
+            string[] category,
+            IIdentified source,
+            MPPKGrouping grouping,
+            (DateTime From, DateTime To) xRange,
+            IEnumerable<string> variants
+        ) : base(id, category, "percent", source, typeof(DateTime), typeof(int), xRange, variants)
+        {
+            Grouping = grouping;
+        }
+
+        public static string CreateId(string file, MPPKGrouping grouping)
+        {
+            var suffix = grouping switch {
+                MPPKGrouping.ByKernel => "byKernel",
+                MPPKGrouping.ByType => "byType",
+                MPPKGrouping.ById => "byId",
+                _ => "unknown",
+            };
+
+            return $"{file}-{suffix}";
+        }
+
+        public static string[] DefaultVariants(MPPKGrouping grouping)
+        {
+            return grouping switch {
+                MPPKGrouping.ByKernel => new[] { "Open-Target", "Open-External", "Open-Initiator", "BackEnd", "System" },
+                MPPKGrouping.ByType => new[] { "LDEV", "ExG", "JNLG" },
+                _ => new[] { "default" },
+            }; 
+        }
+
+        public enum MPPKGrouping
+        {
+            ById,
+            ByKernel,
+            ByType,
+        }
     }
 }

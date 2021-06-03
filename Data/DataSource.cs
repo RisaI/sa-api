@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Http;
+using System.Text.Json.Serialization;
 
 #nullable enable
 
@@ -14,6 +15,8 @@ namespace SAApi.Data
     public abstract class DataSource : IIdentified
     {
         public abstract IEnumerable<Dataset> Datasets { get; }
+        [JsonConverter(typeof(RangeTupleConverter<IEnumerable<DataRange>>))]
+        public abstract IEnumerable<DataRange> Dataranges { get; }
         public IEnumerable<string> Features { get { return RegisteredFeatures.Where(kv => kv.Value.IsActive.Invoke()).Select(kv => kv.Key); } }
         public Dictionary<string, string> Metadata { get; }
 

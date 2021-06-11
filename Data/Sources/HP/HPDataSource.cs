@@ -18,12 +18,14 @@ namespace SAApi.Data.Sources.HP
         public static readonly string[] MPPKZips = new string[] { "PhyProcDetail_dat.ZIP", "MPPK_dat.ZIP" };
 
         string DataPath { get { return _Config["path"]; } }
+        string TimeZone { get { return _Config["tz"] ?? "UTC"; } }
         public override string Type => "hp";
 
         public HPDataSource(string id, IConfigurationSection config)
             : base(id, "Disková pole HP", config)
         {
             Metadata.Add("path", DataPath);
+            Metadata.Add("tz", TimeZone);
 
             // Register features
             RegisterFeature<LDEVMapRequest, IEnumerable<LDEVInfo>>(DataSource.FeatureNames.LDEVMap, LdevMapFeature, () => LDEVs.Count > 0);

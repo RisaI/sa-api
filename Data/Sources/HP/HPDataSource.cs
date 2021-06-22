@@ -15,7 +15,7 @@ namespace SAApi.Data.Sources.HP
     {
         public const string DateFormat = "yyyy/MM/dd HH:mm", DirectoryDateFormat = "yyyyMMdd";
         public static readonly string[] DetectedPatterns = new string[] { "LDEV_*.zip", "Phy*_dat.ZIP", "Port_*.ZIP" };
-        public static readonly string[] MPPKZips = new string[] { "PhyProcDetail_dat.ZIP", "MPPK_dat.ZIP" };
+        public static readonly string[] MPPKZips = new string[] { "PhyProcDetail_dat.ZIP", "PhyMPPK_dat.ZIP" };
 
         string DataPath { get { return _Config["path"]; } }
         string TimeZone { get { return _Config["tz"] ?? "UTC"; } }
@@ -85,6 +85,7 @@ namespace SAApi.Data.Sources.HP
 
                     if (Array.IndexOf(MPPKZips, zip) >= 0)
                     {
+                        Console.WriteLine(zip);
                         map.OpenLocalZip(zip, archive => {
                             foreach (var entry in archive.Entries) {
                                 var range = map.TimeRange;

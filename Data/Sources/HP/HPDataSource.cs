@@ -85,7 +85,6 @@ namespace SAApi.Data.Sources.HP
 
                     if (Array.IndexOf(MPPKZips, zip) >= 0)
                     {
-                        Console.WriteLine(zip);
                         map.OpenLocalZip(zip, archive => {
                             foreach (var entry in archive.Entries) {
                                 var range = map.TimeRange;

@@ -16,6 +16,10 @@ namespace SAApi.Data.Sources.HP
         public const string DateFormat = "yyyy/MM/dd HH:mm", DirectoryDateFormat = "yyyyMMdd";
         public static readonly string[] DetectedPatterns = new string[] { "LDEV_*.zip", "Phy*_dat.ZIP", "Port_*.ZIP" };
         public static readonly string[] MPPKZips = new string[] { "PhyProcDetail_dat.ZIP", "PhyMPPK_dat.ZIP" };
+        public static readonly IDictionary<string, string> CategoryMap = new Dictionary<string, string>() {
+            { "PhyCMPK_dat", "PhyProc_Cache_dat" },
+            { "PhyMPU_dat", "PhyProc_Cache_dat" },
+        };
 
         string DataPath { get { return _Config["path"]; } }
         string TimeZone { get { return _Config["tz"] ?? "UTC"; } }
@@ -119,10 +123,10 @@ namespace SAApi.Data.Sources.HP
                         continue;
                     }
 
-                    var category = Path.GetDirectoryName(zip) switch {
-                        string path when !string.IsNullOrWhiteSpace(path) => path.Split(),
+                    var category = (Path.GetDirectoryName(zip) switch {
+                        string path when !string.IsNullOrWhiteSpace(path) => path.Split('/', '\\'),
                         _ => new string[] { Path.GetFileNameWithoutExtension(zip) }
-                    };
+                    }).Select(s => CategoryMap.ContainsKey(s) ? CategoryMap[s] : s).ToArray();
 
                     map.OpenLocalZip(zip, archive => {
                         foreach (var entry in archive.Entries) {
